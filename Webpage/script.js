@@ -27,15 +27,6 @@ function setup() { //Call this to get the program going.
 	context.beginPath(); //This starts a path so lines can be drawn.
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
-	updateZoomButton = document.getElementById("updateZoom"); //Click this to update the zoom factor to contain the whole path.
-
-	//These are some of the html elements used.
-	updateZoomButton.addEventListener("click", updateZoom);
-	enterZoomTextArea = document.getElementById("youSetZoom");
-	enterZoomButton = document.getElementById("enterZoom");
-	enterZoomButton.addEventListener("click", enterZoom);
-	autoZoomButton = document.getElementById("autoZoom");
-	autoZoomButton.addEventListener("click", toggleAutoZoom);
 
 	ws = new WebSocket("ws://"+webSocketIP+":"+webSocketPort+webSocketPath); //This creates the websocket object.
 	ws.onmessage = function(event) { //When a message is received...
@@ -56,10 +47,10 @@ function mainLoop(data) {
 		//Position Data**************************************************
 
 		//Store the x, y, and z position in a separate variable.
-		positionXYZ = [formatted[formattedDataStringPositionIndeces[0]], formatted[formattedDataStringPositionIndeces[1]], formatted[formattedDataStringPositionIndeces[2]]];
+		var positionXYZ = [formatted[formattedDataStringPositionIndeces[0]], formatted[formattedDataStringPositionIndeces[1]], formatted[formattedDataStringPositionIndeces[2]]];
 
 		//Store the x, y, z, and w quaternion in a separate variable.
-		quaternionXYZW = [formatted[formattedDataStringQuaternionIndeces[1]], formatted[formattedDataStringQuaternionIndeces[0]], formatted[formattedDataStringQuaternionIndeces[2]], formatted[formattedDataStringQuaternionIndeces[3]]];
+		var quaternionXYZW = [formatted[formattedDataStringQuaternionIndeces[1]], formatted[formattedDataStringQuaternionIndeces[0]], formatted[formattedDataStringQuaternionIndeces[2]], formatted[formattedDataStringQuaternionIndeces[3]]];
 
 		//Unfortunately, there's still more formatting to be done.
 		//The data entries stored in positionXYZ and quaternionXYZW are stored as strings, and have a bit before the number (e.g. "x:####").
@@ -83,6 +74,7 @@ function mainLoop(data) {
 		var angleMin = formatted[37];
 		var angleMax = formatted[38];
 		var rangeList = formatted[44];
+		var angleIncrement; //Calculate this later.
 
 		//Get rid of the text in front of angles.
 		angleMin = Number(angleMin.slice(10));
@@ -96,9 +88,34 @@ function mainLoop(data) {
 			rangeList[i] = Number(rangeList[i]); //Make them all numbers!
 		}
 
+		angleIncrement = (angleMax - angleMin) / rangeList.length;
+
 		//console.log(angleMin);
 		//console.log(angleMax);
 		//console.log(rangeList);
+
+		var xyRobotRangeList = [];
+		var xyRangeList = [];
+
+		for(var i=0; i<rangeList.length; ++i) {
+			var scanTheta = angleMin + (i * angleIncrement); //Calculate the angle that the current range value is using.
+
+			//Convert it to x, y form relative to the robot.
+			xyRobotRangeList[i] = [0, 0];
+			xyRobotRangeList[i][0] = rangeList[i] * Math.cos(scanTheta); //x=rcos(θ)
+			xyRobotRangeList[i][1] = rangeList[i] * Math.sin(scanTheta); //y=rsin(θ)
+
+			//Convert it to x, y form relative to the robot, but oriented to the origin.
+			xyRangeList[i] = [0, 0];
+			xyRangeList[i][0] = (xyRobotRangeList[i][0] * Math.cos(-theta)) - (xyRobotRangeList[i][1] * Math.sin(-theta)); //x' = xcosθ-ysinθ
+			xyRangeList[i][1] = (xyRobotRangeList[i][0] * Math.sin(-theta)) + (xyRobotRangeList[i][1] * Math.cos(-theta)); //y' = xsinθ+ycosθ
+
+			//Completely relative to the origin.
+			xyRangeList[i][0] -= positionXYZ[0];
+			xyRangeList[i][1] -= positionXYZ[1];
+		}
+
+		scanRecord.push(xyRangeList);
 
 		//Display**************************************************
 
@@ -218,3 +235,12 @@ function drawRobotPath(currentPosition, angle) {
 //This actually sets it up so if you click "setup", the program starts.
 startButton = document.getElementById("start");
 startButton.addEventListener("click", setup);
+
+//These are some of the html elements used.
+updateZoomButton = document.getElementById("updateZoom");
+updateZoomButton.addEventListener("click", updateZoom);
+enterZoomTextArea = document.getElementById("youSetZoom");
+enterZoomButton = document.getElementById("enterZoom");
+enterZoomButton.addEventListener("click", enterZoom);
+autoZoomButton = document.getElementById("autoZoom");
+autoZoomButton.addEventListener("click", toggleAutoZoom);
