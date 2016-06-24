@@ -9,7 +9,7 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 
-var pointsRecord = []; //This record the list of 2D point where the robot has been, so the program can draw lines between them.
+var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = 100; //As the path and information get bigger, it's useful to zoom out.
 var positionOffset = [0, 0]; //This is used to keep the robot's location on the screen centered.
 var pathMaxLength = Infinity; //If the program ever starts to get slow, this can be used to begin erasing points from the beginning of the path.
@@ -72,6 +72,8 @@ function mainLoop(data) {
 		var theta = eulerAngles[eulerAngleUsed]; //This is the XY-plane angle actually used, rotated 90 degrees so that forward is up instead of right.
 
 		pointsRecord.push([positionXYZ[0], positionXYZ[1]]); //Store the next point to the list.
+
+
 
 		if(autoZoom) {
 			updateZoom(); //If autozoom is selected, automatically set the zoom.
