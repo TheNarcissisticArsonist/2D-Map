@@ -15,6 +15,7 @@ var positionOffset = [0, 0]; //This is used to keep the robot's location on the 
 var pathMaxLength = Infinity; //If the program ever starts to get slow, this can be used to begin erasing points from the beginning of the path.
 						 	  //I'll set it to something once I find that point.
 var autoZoom = false; //This can be toggled. If it's true, the map will scale automatically so everything is visible.
+var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -48,9 +49,12 @@ function setup() { //Call this to get the program going.
 }
 function mainLoop(data) {
 	formatted = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
-	//console.log(formatted);
+	console.log(formatted);
 
 	if(formatted.length == formattedDataStringStandardArrayLength) { //The formatted data should be an array with 46 units. If the array is a different length, something is wrong.
+		
+		//Position Data**************************************************
+
 		//Store the x, y, and z position in a separate variable.
 		positionXYZ = [formatted[formattedDataStringPositionIndeces[0]], formatted[formattedDataStringPositionIndeces[1]], formatted[formattedDataStringPositionIndeces[2]]];
 
@@ -73,7 +77,30 @@ function mainLoop(data) {
 
 		pointsRecord.push([positionXYZ[0], positionXYZ[1]]); //Store the next point to the list.
 
+		//Scan Data**************************************************
 
+		//Store the minimum and maximum angle ranges, and the scan data.
+		var angleMin = formatted[37];
+		var angleMax = formatted[38];
+		var rangeList = formatted[44];
+
+		//Get rid of the text in front of angles.
+		angleMin = Number(angleMin.slice(10));
+		angleMax = Number(angleMax.slice(10));
+		
+		//Convert the string of an array of numbers into an array of numbers.
+		rangeList = rangeList.split(","); //Split along commas.
+		rangeList[0] = rangeList[0].slice(8); //Remove the characters at the beginning.
+		rangeList[rangeList.length-1] = rangeList[rangeList.length-1].slice(0, -1); //Get rid of that one last character.
+		for(var i=0; i<rangeList.length; ++i) {
+			rangeList[i] = Number(rangeList[i]); //Make them all numbers!
+		}
+
+		//console.log(angleMin);
+		//console.log(angleMax);
+		//console.log(rangeList);
+
+		//Display**************************************************
 
 		if(autoZoom) {
 			updateZoom(); //If autozoom is selected, automatically set the zoom.
