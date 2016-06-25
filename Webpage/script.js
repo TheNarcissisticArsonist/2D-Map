@@ -9,6 +9,7 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
+var distanceDisplayThreshold = 0.1; //
 
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
@@ -227,8 +228,14 @@ function drawCurrentMap(currentPosition, scan) {
 	context.moveTo(scan[0][0], scan[0][1]);
 	context.beginPath();
 	for(var i=1; i<scan.length; ++i) {
-		context.lineTo(scan[i][0], scan[i][1]);
-		context.stroke();
+		if(isNaN(scan[i][0]) || isNaN(scan[i][1]) || distance([scan[i][0], scan[i][1]], [scan[i-1][0], scan[i-1][1]]) > distanceDisplayThreshold) {
+			context.moveTo(scan[i][0], scan[i][1]);
+			context.beginPath();
+		}
+		else {
+			context.lineTo(scan[i][0], scan[i][1]);
+			context.stroke();
+		}
 	}
 }
 
