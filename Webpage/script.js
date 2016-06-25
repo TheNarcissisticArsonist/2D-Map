@@ -8,9 +8,10 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 						//0 is roll, 1 is pitch, 2 is yaw.
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
+var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
-var scaleFactor = 100; //As the path and information get bigger, it's useful to zoom out.
+var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
 var positionOffset = [0, 0]; //This is used to keep the robot's location on the screen centered.
 var pathMaxLength = Infinity; //If the program ever starts to get slow, this can be used to begin erasing points from the beginning of the path.
 						 	  //I'll set it to something once I find that point.
@@ -95,7 +96,6 @@ function mainLoop(data) {
 		//console.log(rangeList);
 
 		var xyRobotRangeList = [];
-		var xyRangeList = [];
 
 		for(var i=0; i<rangeList.length; ++i) {
 			var scanTheta = angleMin + (i * angleIncrement); //Calculate the angle that the current range value is using.
@@ -104,18 +104,9 @@ function mainLoop(data) {
 			xyRobotRangeList[i] = [0, 0];
 			xyRobotRangeList[i][0] = rangeList[i] * Math.cos(scanTheta); //x=rcos(θ)
 			xyRobotRangeList[i][1] = rangeList[i] * Math.sin(scanTheta); //y=rsin(θ)
-
-			//Convert it to x, y form relative to the robot, but oriented to the origin.
-			xyRangeList[i] = [0, 0];
-			xyRangeList[i][0] = (xyRobotRangeList[i][0] * Math.cos(-theta)) - (xyRobotRangeList[i][1] * Math.sin(-theta)); //x' = xcosθ-ysinθ
-			xyRangeList[i][1] = (xyRobotRangeList[i][0] * Math.sin(-theta)) + (xyRobotRangeList[i][1] * Math.cos(-theta)); //y' = xsinθ+ycosθ
-
-			//Completely relative to the origin.
-			xyRangeList[i][0] -= positionXYZ[0];
-			xyRangeList[i][1] -= positionXYZ[1];
 		}
 
-		scanRecord.push(xyRangeList);
+		scanRecord.push(xyRobotRangeList);
 
 		//Display**************************************************
 
@@ -127,6 +118,7 @@ function mainLoop(data) {
 
 		clearCanvas();
 		drawRobotMarker();
+		drawCurrentMap(positionXYZ, xyRobotRangeList);
 		drawRobotPath(positionXYZ, theta);
 
 		window.setTimeout(sendDataRequest, 100); //When using recorded data, use window.setTimeout().
@@ -189,7 +181,7 @@ function enterZoom() { //Change the scale factor based on user input.
 	console.log(rawFactor);
 	if(!isNaN(rawFactor)) { //Make sure it's a number.
 		if(Number(rawFactor) > 0) { //Make sure it's positive.
-			scaleFactor = 100*Number(rawFactor);
+			scaleFactor = scaleFactorMultiplier*Number(rawFactor);
 		}
 	}
 }
@@ -228,6 +220,14 @@ function drawRobotPath(currentPosition, angle) {
 	context.beginPath();
 	for(var i=1; i<pointsRecord.length; ++i) { //This draws lines from point i to point i-1
 		context.lineTo(pointsRecord[i][0]-currentPosition[0], pointsRecord[i][1]-currentPosition[1]); //Draw a line to the next point.
+		context.stroke();
+	}
+}
+function drawCurrentMap(currentPosition, scan) {
+	context.moveTo(scan[0][0], scan[0][1]);
+	context.beginPath();
+	for(var i=1; i<scan.length; ++i) {
+		context.lineTo(scan[i][0], scan[i][1]);
 		context.stroke();
 	}
 }
