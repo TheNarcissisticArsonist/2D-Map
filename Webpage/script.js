@@ -103,7 +103,7 @@ function mainLoop(data) {
 			//Convert it to x, y form relative to the robot.
 			xyRobotRangeList[i] = [0, 0];
 			xyRobotRangeList[i][0] = rangeList[i] * Math.cos(scanTheta); //x=rcos(θ)
-			xyRobotRangeList[i][1] = rangeList[i] * Math.sin(scanTheta); //y=rsin(θ)
+			xyRobotRangeList[i][1] = rangeList[i] * -Math.sin(scanTheta); //y=rsin(θ)
 		}
 
 		scanRecord.push(xyRobotRangeList);
