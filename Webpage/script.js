@@ -17,7 +17,7 @@ var positionOffset = [0, 0]; //This is used to keep the robot's location on the 
 var pathMaxLength = Infinity; //If the program ever starts to get slow, this can be used to begin erasing points from the beginning of the path.
 						 	  //I'll set it to something once I find that point.
 var autoZoom = false; //This can be toggled. If it's true, the map will scale automatically so everything is visible.
-var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
+var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. They're in x-y position format, the same as pointsRecord.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -42,7 +42,8 @@ function setup() { //Call this to get the program going.
 }
 function mainLoop(data) {
 	formatted = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
-	console.log(formatted);
+	//console.log(formatted);
+	console.log("Loop!");
 
 	if(formatted.length == formattedDataStringStandardArrayLength) { //The formatted data should be an array with 46 units. If the array is a different length, something is wrong.
 		
@@ -97,6 +98,7 @@ function mainLoop(data) {
 		//console.log(rangeList);
 
 		var xyRobotRangeList = [];
+		var xyRangeList = [];
 
 		for(var i=0; i<rangeList.length; ++i) {
 			var scanTheta = angleMin + (i * angleIncrement); //Calculate the angle that the current range value is using.
@@ -104,10 +106,19 @@ function mainLoop(data) {
 			//Convert it to x, y form relative to the robot.
 			xyRobotRangeList[i] = [0, 0];
 			xyRobotRangeList[i][0] = rangeList[i] * Math.cos(scanTheta); //x=rcos(θ)
-			xyRobotRangeList[i][1] = rangeList[i] * -Math.sin(scanTheta); //y=rsin(θ)
+			xyRobotRangeList[i][1] = rangeList[i] * -Math.sin(scanTheta); //y=rsin(θ) (I'm not sure why there's supposed to be a negative sign -- some quirk with the angles? Look into this.)
+
+			//Rotate it so it's relative to the origin.
+			xyRangeList[i] = [0, 0];
+			xyRangeList[i][0] = xyRobotRangeList[i][0]*Math.cos(theta) + xyRobotRangeList[i][1]*Math.sin(theta);
+			xyRangeList[i][1] = -1*xyRobotRangeList[i][0]*Math.sin(theta) + xyRobotRangeList[i][1]*Math.cos(theta);
+
+			//Translate it so it centers on the origin instead of the robot.
+			xyRangeList[i][0] -= positionXYZ[0];
+			xyRangeList[i][1] -= positionXYZ[1];
 		}
 
-		scanRecord.push(xyRobotRangeList);
+		scanRecord.push(xyRangeList);
 
 		//Display**************************************************
 
@@ -117,12 +128,12 @@ function mainLoop(data) {
 
 		context.lineWidth = 1/scaleFactor; //Make sure the lines don't freak out.
 
-		clearCanvas();
-		drawRobotMarker();
-		drawCurrentMap(positionXYZ, xyRobotRangeList);
+		clearCanvas(positionXYZ);
+		drawRobotMarker(positionXYZ);
 		drawRobotPath(positionXYZ, theta);
+		drawRobotMap(positionXYZ);
 
-		window.setTimeout(sendDataRequest, 100); //When using recorded data, use window.setTimeout().
+		window.setTimeout(sendDataRequest, 500); //When using recorded data, use window.setTimeout().
 		//requestAnimationFrame(sendDataRequest); //When using data directly from the robot, use requestAnimationFrame().
 		//If you use requestAnimationFrame(), comment out EVERY debug statement, or the page will hang pretty quickly.
 	}
@@ -190,30 +201,31 @@ function toggleAutoZoom() {
 	//This is called when you click the button to toggle automatic zoom.
 	autoZoom = !autoZoom;
 }
-function drawRobotMarker() {
+function drawRobotMarker(currentPosition) {
 	//This will draw a circle around the center for the robot marker.
 	context.beginPath();
-	context.arc(0, 0, robotMarkerRadius, 0, 2*Math.PI);
+	context.arc(currentPosition[0], currentPosition[1], robotMarkerRadius, 0, 2*Math.PI);
 	context.stroke();
 
 	//These lines draw a triangle inside the circle, to show the direction of the robot.
 	context.beginPath();
-	context.moveTo(robotMarkerRadius*Math.cos(0), robotMarkerRadius*Math.sin(0));
-	context.lineTo(robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle), robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle));
+	context.moveTo(currentPosition[0] + (robotMarkerRadius*Math.cos(0)), currentPosition[1] + (robotMarkerRadius*Math.sin(0)));
+	context.lineTo(currentPosition[0] + (robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle)), currentPosition[1] + (robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle)));
 	context.stroke();
-	context.moveTo(robotMarkerRadius*Math.cos(0), robotMarkerRadius*Math.sin(0));
-	context.lineTo(robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle), -robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle));
+	context.moveTo(currentPosition[0] + (robotMarkerRadius*Math.cos(0)), currentPosition[1] + (robotMarkerRadius*Math.sin(0)));
+	context.lineTo(currentPosition[0] + (robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle)), currentPosition[1] + (-robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle)));
 	context.stroke();
-	context.moveTo(robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle), robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle));
-	context.lineTo(robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle), -robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle));
+	context.moveTo(currentPosition[0] + (robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle)), currentPosition[1] + (robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle)));
+	context.lineTo(currentPosition[0] + (robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle)), currentPosition[1] + (-robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle)));
 	context.stroke();
 }
-function clearCanvas() {
+function clearCanvas(currentPosition) {
 	context.setTransform(1, 0, 0, 1, 0, 0); //Reset all transforms on the context.
 	context.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas.
-	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center of the canvas.
-	context.transform(scaleFactor, 0, 0, scaleFactor, 0, 0); //Scale the canvas.
 	context.transform(1, 0, 0, -1, 0, 0); //Flip the canvas so y+ is up.
+	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center of the canvas.
+	//context.transform(1, 0, 0, 1, currentPosition[0], -currentPosition[1]); //Put the robot in the center of the canvas.
+	context.transform(scaleFactor, 0, 0, scaleFactor, 0, 0); //Scale the canvas.
 }
 function drawRobotPath(currentPosition, angle) {
 	context.transform(Math.cos(-angle), Math.sin(-angle), -Math.sin(-angle), Math.cos(-angle), 0, 0); //Orient the path behind the robot properly.
@@ -224,7 +236,7 @@ function drawRobotPath(currentPosition, angle) {
 		context.stroke();
 	}
 }
-function drawCurrentMap(currentPosition, scan) {
+/*function drawCurrentMap(currentPosition, scan) {
 	context.moveTo(scan[0][0], scan[0][1]);
 	context.beginPath();
 	for(var i=1; i<scan.length; ++i) {
@@ -235,6 +247,23 @@ function drawCurrentMap(currentPosition, scan) {
 		else {
 			context.lineTo(scan[i][0], scan[i][1]);
 			context.stroke();
+		}
+	}
+}*/
+function drawRobotMap(currentPosition) {
+	for(var i=scanRecord.length-1; i<scanRecord.length; ++i) {
+		if(i<0) {i=0;}
+		context.moveTo(scanRecord[i][0][0], scanRecord[i][0][1]);
+		context.beginPath();
+		for(var j=1; j<scanRecord[i].length; ++j) {
+			if(isNaN(scanRecord[i][j][0]) || isNaN(scanRecord[i][j][1]) || distance([scanRecord[i][j][0], scanRecord[i][j][1]], scanRecord[i][j-1][0], scanRecord[i][j-1][1]) > distanceDisplayThreshold) {
+				context.moveTo(scanRecord[i][j][0], scanRecord[i][j][1]);
+				context.beginPath();
+			}
+			else {
+				context.lineTo(scanRecord[i][j][0], scanRecord[i][j][1]);
+				context.stroke();
+			}
 		}
 	}
 }
