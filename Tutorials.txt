@@ -1,1 +1,7 @@
 http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4767965
+http://resources.mpi-inf.mpg.de/deformableShapeMatching/EG2012_Tutorial/slides/1.2%20ICP_+_TPS_(NM).pdf
+https://en.wikipedia.org/wiki/Nearest_neighbor_search
+http://www.cs.technion.ac.il/~cs236329/tutorials/ICP.pdf
+https://en.wikipedia.org/wiki/Centroid#Of_a_finite_set_of_points
+https://en.wikipedia.org/wiki/Singular_value_decomposition
+https://www.ling.ohio-state.edu/~kbaker/pubs/Singular_Value_Decomposition_Tutorial.pdf

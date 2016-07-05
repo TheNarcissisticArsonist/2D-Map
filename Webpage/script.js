@@ -22,6 +22,7 @@ var angleMinIndex = 37; //This is the formatted array index of the minimum angle
 var angleMaxIndex = 38; //Same, but for the maximum angle.
 var rangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
+var minimumPositionDistanceToRecord = 0.001 //If the distance between two position samples is less than this, only one of the points will be kept.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -55,7 +56,15 @@ function mainLoop(data) {
 		var theta = eulerAngles[eulerAngleUsed];
 		var position = [positionXYZ[0], positionXYZ[1]]
 
-		pointsRecord.push(position);
+		if(pointsRecord.length == 0) {
+			pointsRecord.push(position);
+		}
+		else if(distance(position, pointsRecord[pointsRecord.length - 1]) < minimumPositionDistanceToRecord) {
+			pointsRecord[pointsRecord.length - 1] = position;
+		}
+		else {
+			pointsRecord.push(position);
+		}
 
 		var angleMin = formattedMessage[angleMinIndex];
 		var angleMax = formattedMessage[angleMaxIndex];
@@ -97,7 +106,7 @@ function mainLoop(data) {
 		console.log(formattedMessage);
 	}
 
-	window.setTimeout(sendDataRequest, 100);
+	requestAnimationFrame(sendDataRequest);
 }
 
 function formatRawMessage(raw) { //This takes the raw message and formats it in a way that the data can be accessed more easily.
