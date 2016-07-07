@@ -27,7 +27,7 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var minimumICPDistanceTraveled = 250; //Used to know when to stop ICP.
 var closeICPDistanceThreshold = 10; //Used to know if a scan's ICP is REALLY good.
 var lastSavedScanTime = 0; //Only save scans at most at 1/second.
-var minimumTimeBetweenSavedScans = 1000; //(Milliseconds).
+var minimumTimeBetweenSavedScans = 250; //(Milliseconds).
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
