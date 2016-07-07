@@ -10,7 +10,6 @@ var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's l
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //
-
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
 var positionOffset = [0, 0]; //This is used to keep the robot's location on the screen centered.
@@ -23,6 +22,8 @@ var angleMaxIndex = 38; //Same, but for the maximum angle.
 var rangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
 var minimumPositionDistanceToRecord = 0.001 //If the distance between two position samples is less than this, only one of the points will be kept.
+var scan1 = []; //Used for ICP
+var scan2 = []; //Used for ICP
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -80,16 +81,29 @@ function mainLoop(data) {
 
 		var xyRangeList = convertRangeListToXY(angleMin, angleMax, angleIncrement, rangeList, position, theta);
 
+		var finalRangeList = [];
+
+		for(var i=0; i<xyRangeList.length; ++i) {
+			if((!isNaN(xyRangeList[i][0])) && (!isNaN(xyRangeList[i][1]))) {
+				finalRangeList.push(xyRangeList[i]);
+			}
+		}
+
+		if(scanRecord.length > 0) {
+			icpResult = runICP(scanRecord[scanRecord.length - 1], finalRangeList);
+			rotationMatrix = icpResult.R;
+			translation = icpResult.T;
+			for(var i=0; i<finalRangeList.length; ++i) {
+				finalRangeList[i] = numeric.add(numeric.dot(rotationMatrix, finalRangeList[i]), translation);
+			}
+		}
+
 		if(saveThisScan || scanRecord.length == 0) {
-			scanRecord.push(xyRangeList);
+			scanRecord.push(finalRangeList);
 			saveThisScan = false;
 		}
 		else {
-			scanRecord[scanRecord.length - 1] = xyRangeList;
-		}
-
-		if(autoZoom) {
-			updateZoom(); //If autozoom is selected, automatically set the zoom.
+			scanRecord[scanRecord.length - 1] = finalRangeList;
 		}
 
 		context.lineWidth = 1/scaleFactor;
@@ -203,22 +217,6 @@ function convertRangeListToXY(min, max, increment, ranges, currentPosition, thet
 
 	return scanList;
 }
-function updateZoom() {
-	//This function iterates through every point, determining which point is the furthest away from the current location.
-	//Then, it sets the zoom so that the entire map is visible.
-	var furthestPointIndex = 0;
-	var furthestDistance = distance(pointsRecord[0], pointsRecord[pointsRecord.length-1]);
-	var maxDistance = (canvas.width/2) - (canvas.width/100); //This makes sure there's a little buffer space around the robot's path.
-
-	for(var i=1; i<pointsRecord.length-1; ++i) {
-		currentDistance = distance(pointsRecord[i], pointsRecord[pointsRecord.length-1]); //This calculates the distance between the selected point and the most recent point.
-		if(currentDistance >= furthestDistance) {
-			furthestPointIndex = i;
-			furthestDistance = currentDistance;
-		}
-	}
-	scaleFactor = maxDistance/furthestDistance;
-}
 function distance(pointA, pointB) {
 	//This is just an implementation of the distance formula.
 	return Math.sqrt(Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2));
@@ -231,10 +229,6 @@ function enterZoom() { //Change the scale factor based on user input.
 			scaleFactor = scaleFactorMultiplier*Number(rawFactor);
 		}
 	}
-}
-function toggleAutoZoom() {
-	//This is called when you click the button to toggle automatic zoom.
-	autoZoom = !autoZoom;
 }
 function clearCanvas() {
 	context.setTransform(1, 0, 0, 1, 0, 0); //Reset all transforms on the context.
@@ -281,7 +275,7 @@ function drawRobotMap() {
 		context.moveTo(scan[0][0], scan[0][1]);
 		context.beginPath();
 		for(var j=1; j<scan.length; ++j) {
-			if(isNaN(scan[j][0]) || isNaN(scan[j][1]) || distance([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThreshold) {
+			if(distance([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThreshold) {
 				context.moveTo(scan[j][0], scan[j][1]);
 				context.beginPath();
 			}
@@ -301,17 +295,109 @@ function saveScan() {
 	saveThisScan = true;
 	//This comment is just here so the function will collapse in sublime.
 }
+function saveScan1() {
+	scan1 = scanRecord[scanRecord.length - 1];
+}
+function saveScan2() {
+	scan2 = scanRecord[scanRecord.length - 1];
+}
+function runICP(set1, set2) {
+	var pi = [];
+	var pi1 = [];
+
+	rawPointPairs = matchPoints(set1, set2);
+	for(var i=0; i<rawPointPairs.length; ++i) {
+		pi.push(rawPointPairs[i][0]);
+		pi1.push(rawPointPairs[i][1]);
+	}
+
+	var p = [0, 0];
+	var p1 = [0, 0];
+
+	for(var i=0; i<pi.length; ++i) {
+		p[0] += pi[i][0];
+		p[1] += pi[i][1];
+		p1[0] += pi1[i][0];
+		p1[1] += pi1[i][1];
+	}
+	p[0] = p[0]/pi.length;
+	p[1] = p[1]/pi.length;
+	p1[0] = p1[0]/pi1.length;
+	p1[1] = p1[1]/pi1.length;
+
+	var qi = [];
+	var qi1 = [];
+
+	for(var i=0; i<pi.length; ++i) {
+		qi.push([pi[i][0]-p[0], pi[i][1]-p[1]]);
+		qi1.push([pi1[i][0]-p1[0], pi1[i][1]-p1[1]]);
+	}
+
+	var H = [[0, 0], [0, 0]];
+	for(var i=0; i<qi.length; ++i) {
+		//H = Sum qi * qi1 (transpose)
+		H[0][0] += qi1[i][0]*qi[i][0];
+		H[0][1] += qi1[i][1]*qi[i][0];
+		H[1][0] += qi1[i][0]*qi[i][1];
+		H[1][1] += qi1[i][1]*qi[i][1];
+	}
+
+	var U;
+	var A;
+	var V;
+	var Vt;
+	var Ut;
+
+	svdOutput = numeric.svd(H);
+	U = svdOutput.U;
+	A = svdOutput.S;
+	V = svdOutput.V;
+	Vt = numeric.transpose(V);
+	Ut = numeric.transpose(U);
+
+	rotationMatrix = numeric.dot(V, Ut);
+	
+	translation = [];
+	Rp = numeric.dot(rotationMatrix, p);
+	translation = numeric.sub(p1, Rp);
+
+	console.log(rotationMatrix);
+	console.log(translation);
+
+	return {R: rotationMatrix, T: translation};
+}
+function matchPoints(set1, set2) {
+	var indexPairs = [];
+
+	for(var i=0; i<set2.length; ++i) {
+		if(Math.floor(Math.random() * 50) /*== 0*/ > -1) {
+			var smallestDistance = Infinity;
+			var smallestDistanceIndex;
+			for(var j=0; j<set1.length; ++j) {
+				d = distance(set2[i], set1[j]);
+				if(d < smallestDistance) {
+					smallestDistance = d;
+					smallestDistanceIndex = j;
+				}
+			}
+			indexPairs.push([set1[smallestDistanceIndex], set2[i]]);
+		}
+	}
+
+	return indexPairs;
+}
 
 //This actually sets it up so if you click "setup", the program starts.
 startButton = document.getElementById("start");
 startButton.addEventListener("click", setup);
 
 //These are some of the html elements used.
-updateZoomButton = document.getElementById("updateZoom");
-updateZoomButton.addEventListener("click", updateZoom);
 enterZoomTextArea = document.getElementById("youSetZoom");
 enterZoomButton = document.getElementById("enterZoom");
 enterZoomButton.addEventListener("click", enterZoom);
-autoZoomButton = document.getElementById("autoZoom");
-autoZoomButton.addEventListener("click", toggleAutoZoom);
 document.getElementById("saveScan").addEventListener("click", saveScan);
+document.getElementById("scan1").addEventListener("click", saveScan1);
+document.getElementById("scan2").addEventListener("click", saveScan2);
+document.getElementById("runICP").addEventListener("click", function() {
+	runICP(scan1, scan2);
+});
