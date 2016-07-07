@@ -22,8 +22,12 @@ var angleMaxIndex = 38; //Same, but for the maximum angle.
 var rangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
 var minimumPositionDistanceToRecord = 0.001 //If the distance between two position samples is less than this, only one of the points will be kept.
-var scan1 = []; //Used for ICP
-var scan2 = []; //Used for ICP
+var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
+var positionOffset = [0, 0]; //Ditto the above, but for position.
+var minimumICPDistanceTraveled = 250; //Used to know when to stop ICP.
+var closeICPDistanceThreshold = 10; //Used to know if a scan's ICP is REALLY good.
+var lastSavedScanTime = 0; //Only save scans at most at 1/second.
+var minimumTimeBetweenSavedScans = 1000; //(Milliseconds).
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -54,8 +58,8 @@ function mainLoop(data) {
 		var positionXYZ = getPositionFromFormattedMessage(formattedMessage);
 		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
 		var eulerAngles = quaternionToEuler(quaternion);
-		var theta = eulerAngles[eulerAngleUsed];
-		var position = [positionXYZ[0], positionXYZ[1]]
+		var theta = eulerAngles[eulerAngleUsed] ;//- angleOffset;
+		var position = /*numeric.add([positionXYZ[0], positionXYZ[1]], positionOffset);*/ [positionXYZ[0], positionXYZ[1]];
 
 		if(pointsRecord.length == 0) {
 			pointsRecord.push(position);
@@ -89,17 +93,54 @@ function mainLoop(data) {
 			}
 		}
 
-		if(scanRecord.length > 0) {
-			icpResult = runICP(scanRecord[scanRecord.length - 1], finalRangeList);
-			rotationMatrix = icpResult.R;
-			translation = icpResult.T;
-			for(var i=0; i<finalRangeList.length; ++i) {
-				finalRangeList[i] = numeric.add(numeric.dot(rotationMatrix, finalRangeList[i]), translation);
+		if(scanRecord.length > 1) {
+			var allPoints = [];
+			for(var i=scanRecord.length - 4; i<scanRecord.length - 1; ++i) {
+				if(i >= 0) {
+					allPoints = allPoints.concat(scanRecord[i]);
+				}
+			}
+			var icpResult, rotationMatrix, translation, angle;
+			var finished = false;
+			while(!finished) {
+				icpResult = runICP(allPoints, finalRangeList);
+				rotationMatrix = icpResult.R;
+				translation = icpResult.T;
+				angle = icpResult.theta;
+				if(isNaN(rotationMatrix[0][0]) || isNaN(rotationMatrix[0][1]) || isNaN(rotationMatrix[1][0]) || isNaN(rotationMatrix[1][1]) || isNaN(translation[0]) || isNaN(translation[1]) || isNaN(angle)) {
+					finalRangeList = null;
+					console.log("Oops!");
+					finished = true;
+				}
+				else {
+					var oldFinalRangeList = [];
+					var totalDistanceTraveled = 0;
+					for(var i=0; i<finalRangeList.length; ++i) {
+						oldFinalRangeList[i] = finalRangeList[i];
+						finalRangeList[i] = numeric.add(numeric.dot(rotationMatrix, finalRangeList[i]), translation);
+						totalDistanceTraveled += distance(oldFinalRangeList[i], finalRangeList[i]);
+					}
+					console.log(totalDistanceTraveled);
+					if(totalDistanceTraveled < minimumICPDistanceTraveled) {
+						finished = true;
+						if(totalDistanceTraveled < closeICPDistanceThreshold && new Date().getTime() - lastSavedScanTime > minimumTimeBetweenSavedScans) {
+							saveThisScan = true;
+						}
+					}
+				}
+			}
+			if(finalRangeList != null) {
+				angleOffset -= angle;
+				positionOffset = numeric.sub(positionOffset, translation);
 			}
 		}
 
-		if(saveThisScan || scanRecord.length == 0) {
+		if(finalRangeList == null) {
+			//Do nothing
+		}
+		else if(saveThisScan || scanRecord.length == 0) {
 			scanRecord.push(finalRangeList);
+			lastSavedScanTime = new Date().getTime();
 			saveThisScan = false;
 		}
 		else {
@@ -295,12 +336,6 @@ function saveScan() {
 	saveThisScan = true;
 	//This comment is just here so the function will collapse in sublime.
 }
-function saveScan1() {
-	scan1 = scanRecord[scanRecord.length - 1];
-}
-function saveScan2() {
-	scan2 = scanRecord[scanRecord.length - 1];
-}
 function runICP(set1, set2) {
 	var pi = [];
 	var pi1 = [];
@@ -361,16 +396,16 @@ function runICP(set1, set2) {
 	Rp = numeric.dot(rotationMatrix, p);
 	translation = numeric.sub(p1, Rp);
 
-	console.log(rotationMatrix);
-	console.log(translation);
+	//console.log(rotationMatrix);
+	//console.log(translation);
 
-	return {R: rotationMatrix, T: translation};
+	return {R: rotationMatrix, T: translation, theta: Math.acos(rotationMatrix[0][0])};
 }
 function matchPoints(set1, set2) {
 	var indexPairs = [];
 
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 50) /*== 0*/ > -1) {
+		if(Math.floor(Math.random() * 100) == 0) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=0; j<set1.length; ++j) {
@@ -396,8 +431,3 @@ enterZoomTextArea = document.getElementById("youSetZoom");
 enterZoomButton = document.getElementById("enterZoom");
 enterZoomButton.addEventListener("click", enterZoom);
 document.getElementById("saveScan").addEventListener("click", saveScan);
-document.getElementById("scan1").addEventListener("click", saveScan1);
-document.getElementById("scan2").addEventListener("click", saveScan2);
-document.getElementById("runICP").addEventListener("click", function() {
-	runICP(scan1, scan2);
-});
