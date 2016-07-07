@@ -25,9 +25,10 @@ var minimumPositionDistanceToRecord = 0.001 //If the distance between two positi
 var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
 var minimumICPDistanceTraveled = 250; //Used to know when to stop ICP.
-var closeICPDistanceThreshold = 10; //Used to know if a scan's ICP is REALLY good.
+var closeICPDistanceThreshold = 5; //Used to know if a scan's ICP is REALLY good.
 var lastSavedScanTime = 0; //Only save scans at most at 1/second.
-var minimumTimeBetweenSavedScans = 250; //(Milliseconds).
+var minimumTimeBetweenSavedScans = 1000; //(Milliseconds).
+var minimumPointRetentionDistance = 0.015; //Scans will remove redundant points.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -229,6 +230,7 @@ function cleanUpScanData(min, max, ranges) {
 }
 function convertRangeListToXY(min, max, increment, ranges, currentPosition, theta) {
 	var scanList = [];
+	var reducedScanList = [];
 	var currentScan = [];
 	var scanTheta, x, y, x1, y1;
 	for(var i=0; i<ranges.length; ++i) {
@@ -256,7 +258,15 @@ function convertRangeListToXY(min, max, increment, ranges, currentPosition, thet
 		scanList.push(dataToPush);
 	}
 
-	return scanList;
+	reducedScanList.push(scanList[0]);
+	for(var i=1; i<scanList.length-1; ++i) {
+		if(distance(scanList[i], scanList[i-1]) > minimumPointRetentionDistance || distance(scanList[i], scanList[i+1]) > minimumPointRetentionDistance) {
+			reducedScanList.push(scanList[i]);
+		}
+	}
+	reducedScanList.push(scanList[scanList.length - 1]);
+
+	return reducedScanList;
 }
 function distance(pointA, pointB) {
 	//This is just an implementation of the distance formula.
@@ -405,7 +415,7 @@ function matchPoints(set1, set2) {
 	var indexPairs = [];
 
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) == 0) {
+		if(Math.floor(Math.random() * 100) < 3) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=0; j<set1.length; ++j) {
