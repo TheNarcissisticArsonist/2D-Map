@@ -27,8 +27,9 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var minimumICPDistanceTraveled = 250; //Used to know when to stop ICP.
 var closeICPDistanceThreshold = 5; //Used to know if a scan's ICP is REALLY good.
 var lastSavedScanTime = 0; //Only save scans at most at 1/second.
-var minimumTimeBetweenSavedScans = 1000; //(Milliseconds).
+var minimumTimeBetweenSavedScans = 200; //(Milliseconds).
 var minimumPointRetentionDistance = 0.015; //Scans will remove redundant points.
+var icpMaxDistance = Math.pow(10, 25); //ICP gives up at this point.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -122,11 +123,15 @@ function mainLoop(data) {
 						totalDistanceTraveled += distance(oldFinalRangeList[i], finalRangeList[i]);
 					}
 					console.log(totalDistanceTraveled);
-					if(totalDistanceTraveled < minimumICPDistanceTraveled) {
+					if(totalDistanceTraveled < closeICPDistanceThreshold) {
 						finished = true;
-						if(totalDistanceTraveled < closeICPDistanceThreshold && new Date().getTime() - lastSavedScanTime > minimumTimeBetweenSavedScans) {
+						if(new Date().getTime() - lastSavedScanTime > minimumTimeBetweenSavedScans) {
 							saveThisScan = true;
 						}
+					}
+					else if(totalDistanceTraveled > icpMaxDistance) {
+						finished = true;
+						saveThisScan = false;
 					}
 				}
 			}
