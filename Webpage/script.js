@@ -131,7 +131,6 @@ function mainLoop(data) {
 					}
 					else if(totalDistanceTraveled > icpMaxDistance) {
 						finished = true;
-						saveThisScan = false;
 					}
 				}
 			}
