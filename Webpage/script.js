@@ -9,32 +9,26 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
-var distanceDisplayThreshold = 0.1; //
+var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
 var positionOffset = [0, 0]; //This is used to keep the robot's location on the screen centered.
-var pathMaxLength = Infinity; //If the program ever starts to get slow, this can be used to begin erasing points from the beginning of the path.
-						 	  //I'll set it to something once I find that point.
-var autoZoom = false; //This can be toggled. If it's true, the map will scale automatically so everything is visible.
 var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
-var angleMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
-var angleMaxIndex = 38; //Same, but for the maximum angle.
-var rangeListIndex = 44; //Same, but for the list of ranges.
+var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
+var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
+var scanRangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
-var minimumPositionDistanceToRecord = 0.001 //If the distance between two position samples is less than this, only one of the points will be kept.
 var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
-var minimumICPDistanceTraveled = 250; //Used to know when to stop ICP.
-var closeICPDistanceThreshold = 5; //Used to know if a scan's ICP is REALLY good.
-var lastSavedScanTime = 0; //Only save scans at most at 1/second.
-var minimumTimeBetweenSavedScans = 200; //(Milliseconds).
-var minimumPointRetentionDistance = 0.015; //Scans will remove redundant points.
-var interScanPointRetentionDistance = 1; //Remove redundant points between scans.
-var icpMaxDistance = Math.pow(10, 15); //ICP gives up at this point.
+var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
+var icpAverageDistanceTraveledThreshold = 0.001; //The average distance traveled per point must be less than this for ICP to finish.
+var icpNoMovementCounterThreshold = 6; //ICP must lead to no movement at least this many times for it to finish.
+var numberOfScansToCompare = 5; //How many scans are used for comparison when using ICP.
+var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
-function setup() { //Call this to get the program going
+function setup() {
 	canvas = document.getElementById("mainCanvas"); //Grab the HTML canvas element.
 	canvas.style.transform = "matrix(0, -1, 1, 0, 0, 0)"; //Rotate the canvas so up is forward, like in a map.
 	context = canvas.getContext("2d"); //All canvas drawings are done through a context.
@@ -55,128 +49,29 @@ function setup() { //Call this to get the program going
 }
 function mainLoop(data) {
 	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
-	//console.log(formatted);
 
 	if(formattedMessage.length == formattedDataStringExpectedArrayLength) {
-		var positionXYZ = getPositionFromFormattedMessage(formattedMessage);
+		var robotPositionXYZ = getPositionFromFormattedMessage(formattedMessage);
 		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
 		var eulerAngles = quaternionToEuler(quaternion);
-		var theta = eulerAngles[eulerAngleUsed] ;//- angleOffset;
-		var position = /*numeric.add([positionXYZ[0], positionXYZ[1]], positionOffset);*/ [positionXYZ[0], positionXYZ[1]];
+		var robotOrientationTheta = eulerAngles[eulerAngleUsed];
+		var robotPosition = robotPositionXYZ.slice(0, 2); //This takes the first two values for XYZ position, giving the robot's XY position.
+		
+		var scanDataFormatted = cleanUpScanData(formattedMessage[scanThetaMinIndex], formattedMessage[scanThetaMaxIndex], formattedMessage[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
+		var scanThetaMin = scanDataFormatted[0];
+		var scanThetaMax = scanDataFormatted[1];
+		var scanRangeList = scanDataFormatted[2];
+		var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
 
-		if(pointsRecord.length == 0) {
-			pointsRecord.push(position);
-		}
-		else if(distance(position, pointsRecord[pointsRecord.length - 1]) < minimumPositionDistanceToRecord) {
-			pointsRecord[pointsRecord.length - 1] = position;
-		}
-		else {
-			pointsRecord.push(position);
-		}
+		storePosition(robotPosition);
+		processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta);
 
-		var angleMin = formattedMessage[angleMinIndex];
-		var angleMax = formattedMessage[angleMaxIndex];
-		var rangeList = formattedMessage[rangeListIndex];
-		var angleIncrement; //This is calculated, not read.
-
-		//Format all of the scan data.
-		var scanDataFormatted = cleanUpScanData(angleMin, angleMax, rangeList);
-		angleMin = scanDataFormatted[0];
-		angleMax = scanDataFormatted[1];
-		rangeList = scanDataFormatted[2];
-		angleIncrement = (angleMax - angleMin) / rangeList.length;
-
-		var xyRangeList = convertRangeListToXY(angleMin, angleMax, angleIncrement, rangeList, position, theta);
-
-		var finalRangeList = [];
-
-		for(var i=0; i<xyRangeList.length; ++i) {
-			if((!isNaN(xyRangeList[i][0])) && (!isNaN(xyRangeList[i][1]))) {
-				finalRangeList.push(xyRangeList[i]);
-			}
-		}
-
-		if(scanRecord.length > 1) {
-			var allPoints = [];
-			for(var i=scanRecord.length - 4; i<scanRecord.length; ++i) {
-				if(i >= 0) {
-					allPoints = allPoints.concat(scanRecord[i]);
-				}
-			}
-			var icpResult, rotationMatrix, translation, angle;
-			var finished = false;
-			while(!finished) {
-				icpResult = runICP(allPoints, finalRangeList);
-				rotationMatrix = icpResult.R;
-				translation = icpResult.T;
-				angle = icpResult.theta;
-				if(isNaN(rotationMatrix[0][0]) || isNaN(rotationMatrix[0][1]) || isNaN(rotationMatrix[1][0]) || isNaN(rotationMatrix[1][1]) || isNaN(translation[0]) || isNaN(translation[1]) || isNaN(angle)) {
-					finalRangeList = null;
-					console.log("Oops!");
-					finished = true;
-				}
-				else {
-					var oldFinalRangeList = [];
-					var totalDistanceTraveled = 0;
-					for(var i=0; i<finalRangeList.length; ++i) {
-						oldFinalRangeList[i] = finalRangeList[i];
-						finalRangeList[i] = numeric.add(numeric.dot(rotationMatrix, finalRangeList[i]), translation);
-						totalDistanceTraveled += distance(oldFinalRangeList[i], finalRangeList[i]);
-					}
-					console.log(totalDistanceTraveled);
-					if(totalDistanceTraveled < closeICPDistanceThreshold) {
-						finished = true;
-						if(new Date().getTime() - lastSavedScanTime > minimumTimeBetweenSavedScans) {
-							saveThisScan = true;
-						}
-					}
-					else if(totalDistanceTraveled > icpMaxDistance) {
-						finished = true;
-					}
-				}
-			}
-			if(finalRangeList != null) {
-				angleOffset -= angle;
-				positionOffset = numeric.sub(positionOffset, translation);
-			}
-		}
-
-		if(finalRangeList == null) {
-			//Do nothing
-		}
-		else {
-			var allPoints = [];
-			for(var i=0; i<scanRecord.length; ++i) {
-				allPoints = allPoints.concat(scanRecord[i]);
-			}
-			for(var i=0; i<finalRangeList.length; ++i) {
-				var keepPoint = true;
-				for(var j=0; j<allPoints.length; ++j) {
-					if(distance(finalRangeList[i], allPoints[j]) < interScanPointRetentionDistance) {
-						keepPoint = false;
-						break;
-					}
-				}
-				if(!keepPoint) {
-					finalRangeList.splice(i, 1);
-				}
-			}
-			if(saveThisScan || scanRecord.length == 0) {
-				scanRecord.push(finalRangeList);
-				lastSavedScanTime = new Date().getTime();
-				saveThisScan = false;
-			}
-			else {
-				scanRecord[scanRecord.length - 1] = finalRangeList;
-			}
-		}
-
-		context.lineWidth = 1/scaleFactor;
+		context.lineWidth = 1 / scaleFactor;
 
 		clearCanvas();
 		setConstantCanvasTransforms();
 		drawRobotMarker();
-		setCanvasTransforms(position, theta);
+		setCanvasTransforms(robotPosition, robotOrientationTheta);
 		drawRobotPath();
 		drawRobotMap();
 	}
@@ -186,6 +81,8 @@ function mainLoop(data) {
 	}
 
 	requestAnimationFrame(sendDataRequest);
+	//This sends a data request again, so the server will send the next piece of data, thereby calling the main loop again.
+	//requestAnimationFrame is used so the browser has time to catch up.
 }
 
 function formatRawMessage(raw) { //This takes the raw message and formats it in a way that the data can be accessed more easily.
@@ -193,7 +90,12 @@ function formatRawMessage(raw) { //This takes the raw message and formats it in 
 	for(var i=0; i<refined.length; ++i) { //Now, for each item that was split apart...
 		refined[i] = refined[i].replace(/\s/g, ""); //Remove all the whitespace by replacing spaces with (quite literally) nothing.
 	}
-	return refined; //Spit it back at me.
+	return refined; //Send me the refined message.
+}
+function sendDataRequest() {
+	ws.send("ready");
+	//When this message is sent, the server knows that the webpage is ready to process more data.
+	//The server will then proceed to send the most recent data avaiable.
 }
 function getPositionFromFormattedMessage(formattedMessage) {
 	var position = [0, 0, 0]; //[x, y, z]
@@ -238,58 +140,69 @@ function quaternionToEuler(quat) { //This takes the quaternion array [x, y, z, w
 	euler[2] = Math.atan2(2*((quat[0]*quat[3]) + (quat[1]*quat[2])), 1-(2*((quat[2]*quat[2]) + (quat[3]*quat[3]))));
 	return euler;
 }
-function cleanUpScanData(min, max, ranges) {
-	var angleMin = Number(min.slice(10));
-	var angleMax = Number(max.slice(10));
+function cleanUpScanData(min, max, rangeList) {
+	min = Number(min.slice(10));
+	max = Number(max.slice(10));
 
-	var rangeList = ranges.split(","); //Split along commas.
+	rangeList = rangeList.split(","); //Split along commas.
 	rangeList[0] = rangeList[0].slice(8); //Remove the characters at the beginning.
 	rangeList[rangeList.length - 1] = rangeList[rangeList.length - 1].slice(0, -1); //Get rid of that one last character.
 	for(var i=0; i<rangeList.length; ++i) {
 		rangeList[i] = Number(rangeList[i]); //Make them all numbers!
 	}
 
-	return [angleMin, angleMax, rangeList];
+	return [min, max, rangeList];
 }
-function convertRangeListToXY(min, max, increment, ranges, currentPosition, theta) {
-	var scanList = [];
-	var reducedScanList = [];
-	var currentScan = [];
-	var scanTheta, x, y, x1, y1;
-	for(var i=0; i<ranges.length; ++i) {
-		scanTheta = min + (i * increment);
+function storePosition(position) {
+	pointsRecord.push(position);
+	//This is its own function because I might later want to downsample.
+}
+function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPosition, robotAngle) {
+	var robotXYList = convertScanToRobotXY(angleMin, angleMax, rangeList, angleIncrement);
+	var globalXYList = convertRobotXYToGlobalXY(robotXYList, robotPosition, robotAngle);
+	var cleanGlobalXYList = removeScanNaN(globalXYList);
 
-		//Convert it from polar to cartesian.
-		currentScan[0] = ranges[i] * Math.cos(scanTheta);
-		currentScan[1] = ranges[i] * -Math.sin(scanTheta);
+	if(scanRecord.length > 0) {
+		cleanGlobalXYList = runICP(cleanGlobalXYList);
+	}
 
-		//Rotate it so that it's relative to the origin.
-		x = currentScan[0];
-		y = currentScan[1];
+	reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
+
+	if(reducedGlobalXYList.length > 0) {
+		scanRecord.push(cleanGlobalXYList);
+	}
+}
+function convertScanToRobotXY(min, max, rangeList, increment) {
+	var currentTheta, x, y;
+	var scan = [];
+	for(var i=0; i<rangeList.length; ++i) {
+		currentTheta = min + (i * increment);
+		x = rangeList[i] * Math.cos(currentTheta);
+		y = rangeList[i] * Math.sin(currentTheta) * -1;
+		scan.push([x, y]);
+	}
+	return scan;
+}
+function convertRobotXYToGlobalXY(scan, position, theta) {
+	var x, y, x1, y1;
+	for(var i=0; i<scan.length; ++i) {
+		x = scan[i][0];
+		y = scan[i][1];
 		x1 = (x * Math.cos(-theta)) + (y * Math.sin(-theta));
 		y1 = (-1 * x * Math.sin(-theta)) + (y * Math.cos(-theta));
-		currentScan[0] = x1;
-		currentScan[1] = y1;
-
-		//Translate it so that it's relative to the origin.
-		currentScan[0] += currentPosition[0];
-		currentScan[1] += currentPosition[1];
-
-		var dataToPush = [currentScan[0], currentScan[1]];
-
-		//Push it into the scanList array.
-		scanList.push(dataToPush);
+		scan[i][0] = x1 + position[0];
+		scan[i][1] = y1 + position[1];
 	}
-
-	reducedScanList.push(scanList[0]);
-	for(var i=1; i<scanList.length-1; ++i) {
-		if(distance(scanList[i], scanList[i-1]) > minimumPointRetentionDistance || distance(scanList[i], scanList[i+1]) > minimumPointRetentionDistance) {
-			reducedScanList.push(scanList[i]);
+	return scan;
+}
+function removeScanNaN(scanList) {
+	var cleanScan = [];
+	for(var i=0; i<scanList.length; ++i) {
+		if(!(isNaN(scanList[i][0]) || isNaN(scanList[i][1]))) {
+			cleanScan.push(scanList[i]);
 		}
 	}
-	reducedScanList.push(scanList[scanList.length - 1]);
-
-	return reducedScanList;
+	return cleanScan;
 }
 function distance(pointA, pointB) {
 	//This is just an implementation of the distance formula.
@@ -308,6 +221,10 @@ function clearCanvas() {
 	context.setTransform(1, 0, 0, 1, 0, 0); //Reset all transforms on the context.
 	context.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas.
 	context.beginPath();
+}
+function saveScan() {
+	saveThisScan = true;
+	//This comment is just here so the function will collapse in sublime.
 }
 function setConstantCanvasTransforms() {
 	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center.
@@ -332,11 +249,12 @@ function drawRobotMarker() {
 	context.lineTo(robotMarkerRadius*Math.cos(Math.PI-robotMarkerArrowAngle), -robotMarkerRadius*Math.sin(Math.PI-robotMarkerArrowAngle));
 	context.stroke();
 }
-function setCanvasTransforms(position, theta) {
-	context.transform(Math.cos(-theta), Math.sin(-theta), -Math.sin(-theta), Math.cos(-theta), 0, 0); //Rotate the context so the path is properly oriented.
-	context.transform(1, 0, 0, 1, -position[0], -position[1]);
+function setCanvasTransforms(position, orientation) {
+	context.transform(Math.cos(-orientation), Math.sin(-orientation), -Math.sin(-orientation), Math.cos(-orientation), 0, 0); //Rotate the context so the path is properly oriented.
+	context.transform(1, 0, 0, 1, -position[0], -position[1]); //This is the translation to center the robot.
 }
 function drawRobotPath() {
+	//This will draw a line from each point in the robot's path to the subsequent point.
 	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
 	for(var i=1; i<pointsRecord.length; ++i) {
 		context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
@@ -360,23 +278,73 @@ function drawRobotMap() {
 		}
 	}
 }
-function sendDataRequest() {
-	ws.send("ready");
-	//When this message is sent, the server knows that the webpage is ready to process more data.
-	//The server will then proceed to send the most recent data avaiable.
+function runICP(scan) {
+	var currentScan = [];
+	var knownPoints = [];
+	var finished = false;
+	var iterationTotalDistance = 0;
+	var iterationAverageDistance = 0;
+	var rotationMatrix, translation, icpFunctionOutput;
+	var angle = 0;
+	var pointPairs = [];
+	var icpLoopCounter = 0;
+	var pointSet1 = [];
+	var pointSet2 = [];
+	var oldScanPoints = [];
+
+	for(var i=0; i<scan.length; ++i) {
+		currentScan.push(scan[i]);
+	}
+	for(var i=scanRecord.length - numberOfScansToCompare - 1; i<scanRecord.length; ++i) {
+		if(i >= 0) {
+			knownPoints = knownPoints.concat(scanRecord[i]);
+		}
+	}
+	while(!finished) {
+		iterationTotalDistance = 0;
+		pointSet1 = [];
+		pointSet2 = [];
+
+		pointPairs = matchPoints(knownPoints, currentScan);
+		for(var i=0; i<pointPairs.length; ++i) {
+			pointSet1[i] = pointPairs[i][0];
+			pointSet2[i] = pointPairs[i][1];
+		}
+		icpFunctionOutput = ICP(pointSet1, pointSet2);
+		rotationMatrix = icpFunctionOutput.R;
+		translation = icpFunctionOutput.T;
+		angle = icpFunctionOutput.theta;
+
+		for(var i=0; i<currentScan.length; ++i) {
+			oldScanPoints[i] = currentScan[i];
+			currentScan[i] = numeric.add(numeric.dot(rotationMatrix, currentScan[i]), translation);
+			iterationTotalDistance += distance(oldScanPoints[i], currentScan[i]);
+		}
+		iterationAverageDistance = iterationTotalDistance / currentScan.length;
+
+		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
+			++icpLoopCounter;
+			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
+				finished = true;
+			}
+		}
+		else {
+			icpLoopCounter = 0;
+		}
+		
+		angleOffset -= angle;
+		positionOffset = numeric.sub(positionOffset, translation);
+	}
+
+	return currentScan;
 }
-function saveScan() {
-	saveThisScan = true;
-	//This comment is just here so the function will collapse in sublime.
-}
-function runICP(set1, set2) {
+function ICP(set1, set2) {
 	var pi = [];
 	var pi1 = [];
 
-	rawPointPairs = matchPoints(set1, set2);
-	for(var i=0; i<rawPointPairs.length; ++i) {
-		pi.push(rawPointPairs[i][0]);
-		pi1.push(rawPointPairs[i][1]);
+	for(var i=0; i<set2.length; ++i) {
+		pi.push(set1[i]);
+		pi1.push(set2[i]);
 	}
 
 	var p = [0, 0];
@@ -432,6 +400,17 @@ function runICP(set1, set2) {
 	//console.log(rotationMatrix);
 	//console.log(translation);
 
+	for(var i=0; i<2; ++i) {
+		for(var j=0; j<2; ++j) {
+			if(rotationMatrix[i][j] > 1) {
+				rotationMatrix[i][j] = 1;
+			}
+			else if(rotationMatrix[i][j] < -1) {
+				rotationMatrix[i][j] = -1;
+			}
+		}
+	}
+
 	return {R: rotationMatrix, T: translation, theta: Math.acos(rotationMatrix[0][0])};
 }
 function matchPoints(set1, set2) {
@@ -448,11 +427,32 @@ function matchPoints(set1, set2) {
 					smallestDistanceIndex = j;
 				}
 			}
-			indexPairs.push([set1[smallestDistanceIndex], set2[i]]);
+			indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
 		}
 	}
 
 	return indexPairs;
+}
+function removeDuplicates(scan) {
+	var allPoints = [];
+	var remove = false;
+	for(var i=0; i<scanRecord.length; ++i) {
+		allPoints = allPoints.concat(scanRecord[i]);
+	}
+	for(var i=scan.length - 1; i>=0; --i) {
+		remove = false;
+		for(var j=0; j<allPoints.length; ++j) {
+			var d = distance(scan[i], allPoints[j]);
+			if(d < scanDensityDistance) {
+				remove = true;
+				break;
+			}
+		}
+		if(remove) {
+			scan.splice(i, 1);
+		}
+	}
+	return scan;
 }
 
 //This actually sets it up so if you click "setup", the program starts.
