@@ -61,8 +61,8 @@ function mainLoop(data) {
 		var robotPositionXYZ = getPositionFromFormattedMessage(formattedMessage);
 		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
 		var eulerAngles = quaternionToEuler(quaternion);
-		var robotOrientationTheta = eulerAngles[eulerAngleUsed];
-		var robotPosition = robotPositionXYZ.slice(0, 2); //This takes the first two values for XYZ position, giving the robot's XY position.
+		var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
+		var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset); //This takes the first two values for XYZ position, giving the robot's XY position.
 		
 		var scanDataFormatted = cleanUpScanData(formattedMessage[scanThetaMinIndex], formattedMessage[scanThetaMaxIndex], formattedMessage[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
 		var scanThetaMin = scanDataFormatted[0];
@@ -267,9 +267,17 @@ function setCanvasTransforms(position, orientation) {
 function drawRobotPath() {
 	//This will draw a line from each point in the robot's path to the subsequent point.
 	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
+	var d;
 	for(var i=1; i<pointsRecord.length; ++i) {
-		context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
-		context.stroke();
+		d = distance([pointsRecord[i][0], pointsRecord[i][1]], [pointsRecord[i-1][0], pointsRecord[i-1][1]]);
+		if(distance > 0.05) {
+			context.moveTo(pointsRecord[i][0], pointsRecord[i][1]);
+			context.beginPath();
+		}
+		else {
+			context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
+			context.stroke();
+		}
 	}
 }
 function drawRobotMap() {
@@ -353,12 +361,17 @@ function runICP(scan) {
 			icpLoopCounter = 0;
 		}
 		
-		scanAngleError -= angle;
-		scanPositionError = numeric.sub(scanPositionError, translation);
+		scanAngleError += angle;
+		scanPositionError = numeric.add(scanPositionError, translation);
 	}
 
-	//console.log("Angle error: " + scanAngleError);
-	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
+	console.log("Angle error: " + scanAngleError);
+	console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
+
+	if(Math.floor(Math.random() * 10) < 1) {
+		angleOffset -= scanAngleError;
+		positionOffset = numeric.sub(positionOffset, scanPositionError);
+	}
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
