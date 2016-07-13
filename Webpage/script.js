@@ -24,11 +24,15 @@ var minimumPositionDistanceToRecord = 0.01; //If the distance between two positi
 var icpAverageDistanceTraveledThreshold = 0.001; //The average distance traveled per point must be less than this for ICP to finish.
 var icpNoMovementCounterThreshold = 6; //ICP must lead to no movement at least this many times for it to finish.
 var numberOfScansToCompare = 5; //How many scans are used for comparison when using ICP.
-var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
+var scanDensityDistance = 0.1; //In meters, the minimum significant distance between two points.
+var maxICPLoopCount = Infinity; //The maximum number of times ICP can run.
+var minICPComparePoints = 2500; //The minimum number of points ICP must use to compare.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
 function setup() {
+	console.log("Running setup function.");
+
 	canvas = document.getElementById("mainCanvas"); //Grab the HTML canvas element.
 	canvas.style.transform = "matrix(0, -1, 1, 0, 0, 0)"; //Rotate the canvas so up is forward, like in a map.
 	context = canvas.getContext("2d"); //All canvas drawings are done through a context.
@@ -48,6 +52,8 @@ function setup() {
 	}
 }
 function mainLoop(data) {
+	console.log("Main loop!");
+
 	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
 
 	if(formattedMessage.length == formattedDataStringExpectedArrayLength) {
@@ -291,21 +297,32 @@ function runICP(scan) {
 	var pointSet1 = [];
 	var pointSet2 = [];
 	var oldScanPoints = [];
+	var totalLoopCount = 0;
+	var oldPositionOffset = [positionOffset[0], positionOffset[1]];
+	var oldAngleOffset = angleOffset;
 
 	for(var i=0; i<scan.length; ++i) {
 		currentScan.push(scan[i]);
 	}
-	for(var i=scanRecord.length - numberOfScansToCompare - 1; i<scanRecord.length; ++i) {
-		if(i >= 0) {
-			knownPoints = knownPoints.concat(scanRecord[i]);
-		}
+	var i = scanRecord.length - 1;
+	while(i >= 0 && knownPoints.length <= minICPComparePoints) {
+		knownPoints = knownPoints.concat(scanRecord[i]);
+		--i;
 	}
 	while(!finished) {
+		++totalLoopCount;
+		if(totalLoopCount >= maxICPLoopCount) {
+			currentScan = [];
+			positionOffset[0] = oldPositionOffset[0];
+			positionOffset[1] = oldPositionOffset[1];
+			angleOffset = oldAngleOffset;
+			break;
+		}
 		iterationTotalDistance = 0;
 		pointSet1 = [];
 		pointSet2 = [];
 
-		pointPairs = matchPoints(knownPoints, currentScan);
+		pointPairs = matchPoints(knownPoints, currentScan, totalLoopCount);
 		for(var i=0; i<pointPairs.length; ++i) {
 			pointSet1[i] = pointPairs[i][0];
 			pointSet2[i] = pointPairs[i][1];
@@ -322,6 +339,8 @@ function runICP(scan) {
 		}
 		iterationAverageDistance = iterationTotalDistance / currentScan.length;
 
+		//console.log(iterationAverageDistance);
+
 		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
 			++icpLoopCounter;
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
@@ -335,6 +354,8 @@ function runICP(scan) {
 		angleOffset -= angle;
 		positionOffset = numeric.sub(positionOffset, translation);
 	}
+
+	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
 	return currentScan;
 }
@@ -413,21 +434,26 @@ function ICP(set1, set2) {
 
 	return {R: rotationMatrix, T: translation, theta: Math.acos(rotationMatrix[0][0])};
 }
-function matchPoints(set1, set2) {
+function matchPoints(set1, set2, percentToMatch) {
 	var indexPairs = [];
+	
+	//percentToMatch should be between 0 and 100.
+	var numToMatch = percentToMatch * 0.01 * set2.length;
 
-	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) > -1) {
-			var smallestDistance = Infinity;
-			var smallestDistanceIndex;
-			for(var j=0; j<set1.length; ++j) {
-				d = distance(set2[i], set1[j]);
-				if(d < smallestDistance) {
-					smallestDistance = d;
-					smallestDistanceIndex = j;
+	while(indexPairs.length <= numToMatch) {
+		for(var i=0; i<set2.length; ++i) {
+			if(Math.floor(Math.random() * 100) < percentToMatch) {
+				var smallestDistance = Infinity;
+				var smallestDistanceIndex;
+				for(var j=0; j<set1.length; ++j) {
+					d = distance(set2[i], set1[j]);
+					if(d < smallestDistance) {
+						smallestDistance = d;
+						smallestDistanceIndex = j;
+					}
 				}
+				indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
 			}
-			indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
 		}
 	}
 
