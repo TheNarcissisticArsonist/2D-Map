@@ -52,11 +52,10 @@ function setup() {
 	}
 }
 function mainLoop(data) {
-	console.log("Main loop!");
-
 	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
 
 	if(formattedMessage.length == formattedDataStringExpectedArrayLength) {
+		console.log("Main loop!");
 		var robotPositionXYZ = getPositionFromFormattedMessage(formattedMessage);
 		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
 		var eulerAngles = quaternionToEuler(quaternion);
@@ -82,8 +81,12 @@ function mainLoop(data) {
 		drawRobotMap();
 	}
 	else {
-		console.log("Error! The message is of an unexpected format!");
-		console.log(formattedMessage);
+		if(formattedMessage[0] == "OLD" || formattedMessage[formattedMessage.length - 1] == "OLD") {
+			console.log("Error! The message is of an unexpected format! (Old data)");
+		}
+		else {
+			console.log("Error! The message is of an unexpected format!\n" + formattedMessage);
+		}
 	}
 
 	requestAnimationFrame(sendDataRequest);

@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan
 
 connectionOpened = False # If there's a connection, this will be True
 lastOdomMessage = ""
-lastlaserMessage = ""
+lastLaserMessage = ""
 
 # The websocket server object
 class WebSocketServer(wspy.Connection):
@@ -26,10 +26,13 @@ class WebSocketServer(wspy.Connection):
 	def onmessage(self, message):
 		print 'Received message "%s"' % message.payload
 		global lastOdomMessage
-		global lastlaserMessage
-		stringToSend = lastOdomMessage + "\n\n" + lastlaserMessage
+		global lastLaserMessage
+		stringToSend = lastOdomMessage + "\n\n" + lastLaserMessage
 		if message.payload == "ready": # If the webpage is ready, give it data
 			self.send(wspy.TextMessage(unicode(stringToSend, "utf-8")))
+			if lastOdomMessage != "OLD" and lastLaserMessage != "old":
+				lastOdomMessage = "OLD"
+				lastLaserMessage = "OLD"
 
 	# Run upon closing the connection
 	def onclose(self, code, reason):
@@ -46,11 +49,13 @@ server.listen(5)
 # This code is run whenever data is received from the ROS subscriber node
 def odomCallback(data):
 	global lastOdomMessage
-	lastOdomMessage = data.__str__() #data.__str__() formats the message as string so it can 
+	lastOdomMessage = data.__str__() #data.__str__() formats the message as string so it can
+	print "Received odom data!"
 
 def laserCallback(data):
-	global lastlaserMessage
-	lastlaserMessage = data.__str__()
+	global lastLaserMessage
+	lastLaserMessage = data.__str__()
+	print "Received scan data!"
 
 # This code creates the subscriber node
 def odomListener():
