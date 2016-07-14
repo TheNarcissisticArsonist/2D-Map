@@ -22,12 +22,13 @@ var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
-var icpNoMovementCounterThreshold = 6; //ICP must lead to no movement at least this many times for it to finish.
+var icpNoMovementCounterThreshold = 3; //ICP must lead to no movement at least this many times for it to finish.
 var numberOfScansToCompare = 5; //How many scans are used for comparison when using ICP.
 var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
+var goodCorrespondenceThreshold = icpAverageDistanceTraveledThreshold; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -468,6 +469,9 @@ function matchPoints(set1, set2) {
 					if(d < smallestDistance) {
 						smallestDistance = d;
 						smallestDistanceIndex = j;
+					}
+					if(d < goodCorrespondenceThreshold) {
+						break;
 					}
 				}
 				if(smallestDistance < maximumPointMatchDistance) {
