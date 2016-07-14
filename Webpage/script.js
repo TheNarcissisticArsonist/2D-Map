@@ -12,7 +12,6 @@ var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
-var positionOffset = [0, 0]; //This is used to keep the robot's location on the screen centered.
 var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
