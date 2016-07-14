@@ -29,6 +29,7 @@ var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
 var goodCorrespondenceThreshold = icpAverageDistanceTraveledThreshold; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
+var currentlyScanning = true;
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -54,6 +55,26 @@ function setup() {
 	}
 }
 function mainLoop(data) {
+	if(!currentlyScanning) {
+		console.log("Not currently scanning.");
+
+		var robotPosition = numeric.sub(pointsRecord[pointsRecord.length - 1], positionOffset);
+		var y = pointsRecord[pointsRecord.length - 1][1] - pointsRecord[pointsRecord.length - 2][1];
+		var x = pointsRecord[pointsRecord.length - 1][0] - pointsRecord[pointsRecord.length - 2][0];
+		var robotOrientationTheta = Math.atan2(y, x);
+
+		context.lineWidth = 1 / scaleFactor;
+		clearCanvas();
+		setConstantCanvasTransforms();
+		drawRobotMarker();
+		setCanvasTransforms(robotPosition, robotOrientationTheta);
+		drawRobotPath();
+		drawRobotMap();
+
+		requestAnimationFrame(mainLoop);
+		return;
+	}
+
 	//console.log("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
 
@@ -75,7 +96,6 @@ function mainLoop(data) {
 		processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta);
 
 		context.lineWidth = 1 / scaleFactor;
-
 		clearCanvas();
 		setConstantCanvasTransforms();
 		drawRobotMarker();
@@ -504,6 +524,10 @@ function removeDuplicates(scan) {
 	}
 	return scan;
 }
+function stopScanning() {
+	currentlyScanning = false;
+	//This allows you to still zoom in and out on the map when the map is paused.
+}
 
 //This actually sets it up so if you click "setup", the program starts.
 startButton = document.getElementById("start");
@@ -514,3 +538,4 @@ enterZoomTextArea = document.getElementById("youSetZoom");
 enterZoomButton = document.getElementById("enterZoom");
 enterZoomButton.addEventListener("click", enterZoom);
 document.getElementById("saveScan").addEventListener("click", saveScan);
+document.getElementById("stopScanning").addEventListener("click", stopScanning);
