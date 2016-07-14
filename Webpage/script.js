@@ -308,6 +308,8 @@ function drawRobotPath() {
 	context.beginPath();
 }
 function drawRobotMap() {
+	context.strokeStyle = "#aa0000";
+	context.beginPath();
 	for(var i=0; i<scanRecord.length; ++i) {
 		scan = scanRecord[i];
 		context.moveTo(scan[0][0], scan[0][1]);
@@ -323,6 +325,8 @@ function drawRobotMap() {
 			}
 		}
 	}
+	context.strokeStyle = "#000000";
+	context.beginPath();
 }
 function runICP(scan) {
 	var currentScan = [];
