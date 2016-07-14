@@ -29,7 +29,9 @@ var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
 var goodCorrespondenceThreshold = icpAverageDistanceTraveledThreshold; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
-var currentlyScanning = true;
+var currentlyScanning = true; //Used to know when to stop asking for more scans.
+var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
+var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -58,10 +60,8 @@ function mainLoop(data) {
 	if(!currentlyScanning) {
 		console.log("Not currently scanning.");
 
-		var robotPosition = numeric.sub(pointsRecord[pointsRecord.length - 1], positionOffset);
-		var y = pointsRecord[pointsRecord.length - 1][1] - pointsRecord[pointsRecord.length - 2][1];
-		var x = pointsRecord[pointsRecord.length - 1][0] - pointsRecord[pointsRecord.length - 2][0];
-		var robotOrientationTheta = Math.atan2(y, x);
+		var robotPosition = lastPosition;
+		var robotOrientationTheta = lastAngle;
 
 		context.lineWidth = 1 / scaleFactor;
 		clearCanvas();
@@ -85,6 +85,7 @@ function mainLoop(data) {
 		var eulerAngles = quaternionToEuler(quaternion);
 		var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
 		var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset); //This takes the first two values for XYZ position, giving the robot's XY position.
+		lastAngle = robotOrientationTheta;
 		
 		var scanDataFormatted = cleanUpScanData(formattedMessage[scanThetaMinIndex], formattedMessage[scanThetaMaxIndex], formattedMessage[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
 		var scanThetaMin = scanDataFormatted[0];
@@ -298,6 +299,7 @@ function drawRobotPath() {
 		else {
 			context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
 			context.stroke();
+			lastPosition = [pointsRecord[i][0], pointsRecord[i][1]];
 		}
 	}
 }
