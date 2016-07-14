@@ -287,6 +287,8 @@ function setCanvasTransforms(position, orientation) {
 	context.transform(1, 0, 0, 1, -position[0], -position[1]); //This is the translation to center the robot.
 }
 function drawRobotPath() {
+	context.strokeStyle = "#00aa00";
+	context.beginPath();
 	//This will draw a line from each point in the robot's path to the subsequent point.
 	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
 	var d;
@@ -302,6 +304,8 @@ function drawRobotPath() {
 			lastPosition = [pointsRecord[i][0], pointsRecord[i][1]];
 		}
 	}
+	context.strokeStyle = "#000000";
+	context.beginPath();
 }
 function drawRobotMap() {
 	for(var i=0; i<scanRecord.length; ++i) {
