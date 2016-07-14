@@ -28,7 +28,7 @@ var scanDensityDistance = 0.01; //In meters, the minimum significant distance be
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
-var goodCorrespondenceThreshold = icpAverageDistanceTraveledThreshold; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
+var goodCorrespondenceThreshold = 0.01; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
@@ -382,16 +382,16 @@ function runICP(scan) {
 		}
 		iterationAverageDistance = iterationTotalDistance / currentScan.length;
 
-		console.log(iterationAverageDistance);
-
 		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
 			++icpLoopCounter;
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
 			}
+			console.log("Good scan! " + iterationAverageDistance);
 		}
 		else {
 			icpLoopCounter = 0;
+			console.log("           " + iterationAverageDistance);
 		}
 		
 		scanAngleError += angle;
@@ -491,10 +491,10 @@ function matchPoints(set1, set2) {
 
 	while(indexPairs.length <= numToMatch) {
 		for(var i=0; i<set2.length; ++i) {
-			if(Math.floor(Math.random() * 100) < 25) {
+			if(Math.floor(Math.random() * 100) < 100 * (1/25)) {
 				var smallestDistance = Infinity;
 				var smallestDistanceIndex;
-				for(var j=0; j<set1.length; ++j) {
+				for(var j=set1.length - 1; j>=0; --j) {
 					d = distance(set2[i], set1[j]);
 					if(d < smallestDistance) {
 						smallestDistance = d;
