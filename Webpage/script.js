@@ -349,6 +349,8 @@ function runICP(scan) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
 			currentScan = [];
+			scanAngleError = 0;
+			scanPositionError = [0, 0];
 			break;
 		}
 		iterationTotalDistance = 0;
@@ -391,10 +393,8 @@ function runICP(scan) {
 	console.log("Angle error: " + scanAngleError);
 	console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
-	if(Math.floor(Math.random() * 10) < 1) {
-		angleOffset -= scanAngleError;
-		positionOffset = numeric.sub(positionOffset, scanPositionError);
-	}
+	angleOffset -= scanAngleError;
+	positionOffset = numeric.sub(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
