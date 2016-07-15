@@ -33,7 +33,6 @@ var lastAngle = 0; //Saved each iteration in case the user turns off scans. Upda
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
-
 function setup() {
 	console.log("Running setup function.");
 
@@ -57,8 +56,11 @@ function setup() {
 }
 function mainLoop(data) {
 	if(!currentlyScanning) {
+		//This section of code can be activated by clicking the button to stop scanning on the webpage.
+		//It allows you to zoom in and out, without taking new scans. Since ICP isn't being run, it renders much more quickly.
 		console.log("Not currently scanning.");
 
+		//These are saved, to keep the screen centered on where the robot would be. I may rework this later.
 		var robotPosition = lastPosition;
 		var robotOrientationTheta = lastAngle;
 
@@ -74,17 +76,20 @@ function mainLoop(data) {
 		return;
 	}
 
-	//console.log("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
 
-	if(formattedMessage.length == formattedDataStringExpectedArrayLength) {
-		console.log("Main loop!");
+	if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //I.e., the data is correct...
+		//console.log("Main loop!");
+
 		var robotPositionXYZ = getPositionFromFormattedMessage(formattedMessage);
 		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
-		var eulerAngles = quaternionToEuler(quaternion);
+		var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses.
+
+		//This offsets the position and orientation by the stored error.
 		var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
-		var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset); //This takes the first two values for XYZ position, giving the robot's XY position.
-		lastAngle = robotOrientationTheta;
+		var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset);
+
+		lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
 		
 		var scanDataFormatted = cleanUpScanData(formattedMessage[scanThetaMinIndex], formattedMessage[scanThetaMaxIndex], formattedMessage[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
 		var scanThetaMin = scanDataFormatted[0];
@@ -92,10 +97,11 @@ function mainLoop(data) {
 		var scanRangeList = scanDataFormatted[2];
 		var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
 
-		storePosition(robotPosition);
-		processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta);
+		storePosition(robotPosition); //This appends the robotPosition to the pointsRecord array, and does absolutely nothing else (yet).
+		processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
 
-		context.lineWidth = 1 / scaleFactor;
+		context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
+
 		clearCanvas();
 		setConstantCanvasTransforms();
 		drawRobotMarker();
@@ -105,10 +111,10 @@ function mainLoop(data) {
 	}
 	else {
 		if(formattedMessage[0] == "OLD" || formattedMessage[formattedMessage.length - 1] == "OLD") {
-			console.log("Error! The message is of an unexpected format! (Old data)");
+			//console.log("Error! The message is of an unexpected format! (Old data)");
 		}
 		else {
-			console.log("Error! The message is of an unexpected format!\n" + formattedMessage);
+			console.log("Error! The message is of an unexpected format!\n" + formattedMessage); //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.k
 		}
 	}
 
@@ -127,17 +133,18 @@ function formatRawMessage(raw) { //This takes the raw message and formats it in 
 function sendDataRequest() {
 	ws.send("ready");
 	//When this message is sent, the server knows that the webpage is ready to process more data.
-	//The server will then proceed to send the most recent data avaiable.
+	//The server will then proceed to send the most recent data avaiable. If no new data is available, it will send a message to that effect.
 }
 function getPositionFromFormattedMessage(formattedMessage) {
 	var position = [0, 0, 0]; //[x, y, z]
 
-	//These are the locations of the three relavent data values.
+	//These are the locations of the three relavent data values. You can change these with the variables at the top.
 	position[0] = formattedMessage[formattedDataStringPositionIndeces[0]];
 	position[1] = formattedMessage[formattedDataStringPositionIndeces[1]];
 	position[2] = formattedMessage[formattedDataStringPositionIndeces[2]];
 
 	//This removes the stuff around the number itself in the string, and actually converts it to a number.
+	//The actual raw value is something like "x:######".
 	for(var i=0; i<position.length; ++i) {
 		position[i] = Number(position[i].slice(2));
 	}
@@ -154,6 +161,7 @@ function getQuaternionFromFormattedMessage(formattedMessage) {
 	quaternion[3] = formattedMessage[formattedDataStringQuaternionIndeces[3]];
 	
 	//This removes the stuff around the number itself in the string, and actually converts it to a number.
+	//The actual raw value is something like "x:######".
 	for(var i=0; i<quaternion.length; ++i) {
 		quaternion[i] = Number(quaternion[i].slice(2));
 	}
@@ -166,13 +174,19 @@ function quaternionToEuler(quat) { //This takes the quaternion array [x, y, z, w
 	//It's easiest to think of them as φ=pitch (index 0), θ=roll (index 1), and ψ=yaw (index 2).
 	//These formulas were taken from https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles#Euler_Angles_from_Quaternion
 
+	var x = quat[0];
+	var y = quat[1];
+	var z = quat[2];
+	var w = quat[3];
+
 	euler = [];
-	euler[0] = Math.atan2(2*((quat[0]*quat[1]) + (quat[2]*quat[3])), 1-(2*((quat[1]*quat[1]) + (quat[2]*quat[2]))));
-	euler[1] = Math.asin(2*((quat[0]*quat[2]) - (quat[3]*quat[1])));
-	euler[2] = Math.atan2(2*((quat[0]*quat[3]) + (quat[1]*quat[2])), 1-(2*((quat[2]*quat[2]) + (quat[3]*quat[3]))));
+	euler[0] = Math.atan2(2*((x*y) + (z*w)), 1-(2*((y*y) + (z*z))));
+	euler[1] = Math.asin(2*((x*z) - (w*y)));
+	euler[2] = Math.atan2(2*((x*w) + (y*z)), 1-(2*((z*z) + (w*w))));
 	return euler;
 }
 function cleanUpScanData(min, max, rangeList) {
+	//Trimming away some text before the number.
 	min = Number(min.slice(10));
 	max = Number(max.slice(10));
 
@@ -187,14 +201,16 @@ function cleanUpScanData(min, max, rangeList) {
 }
 function storePosition(position) {
 	pointsRecord.push(position);
-	//This is its own function because I might later want to downsample.
+	//This is its own function because I might later want to downsample, or do some other manipulation on the point.
 }
 function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPosition, robotAngle) {
+	//Throughout this function, the scan is gradually refined from a list of distances to a set of newfound points to add to the map.
 	var robotXYList = convertScanToRobotXY(angleMin, angleMax, rangeList, angleIncrement);
 	var globalXYList = convertRobotXYToGlobalXY(robotXYList, robotPosition, robotAngle);
 	var cleanGlobalXYList = removeScanNaN(globalXYList);
 
 	if(scanRecord.length > 0) {
+		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
 		cleanGlobalXYList = runICP(cleanGlobalXYList);
 	}
 
@@ -355,6 +371,7 @@ function runICP(scan) {
 	while(!finished) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
+			console.log("Fail!");
 			currentScan = [];
 			scanAngleError = 0;
 			scanPositionError = [0, 0];
@@ -385,20 +402,21 @@ function runICP(scan) {
 			++icpLoopCounter;
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
+				console.log("Success!");
 			}
-			console.log("Good scan! " + iterationAverageDistance);
+			//console.log("Good scan! " + iterationAverageDistance);
 		}
 		else {
 			icpLoopCounter = 0;
-			console.log("           " + iterationAverageDistance);
+			//console.log("           " + iterationAverageDistance);
 		}
 		
 		scanAngleError += angle;
 		scanPositionError = numeric.add(scanPositionError, translation);
 	}
 
-	console.log("Angle error: " + scanAngleError);
-	console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
+	//console.log("Angle error: " + scanAngleError);
+	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
 	angleOffset -= scanAngleError;
 	positionOffset = numeric.sub(positionOffset, scanPositionError);
