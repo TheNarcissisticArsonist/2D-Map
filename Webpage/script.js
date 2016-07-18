@@ -33,6 +33,10 @@ var lastAngle = 0; //Saved each iteration in case the user turns off scans. Upda
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
 var numFailedScans = 0; //How many scans have failed in a row.
 var maxNumFailedScans = 10; //How many scans have to fail in a row to go to user-manual fit.
+var currentMouseCoords = [0, 0]; //The current coordinates of the mouse.
+var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked.
+var wasTheCanvasClicked = false; //Pretty self explanatory.
+var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 function setup() {
@@ -43,6 +47,10 @@ function setup() {
 	context = canvas.getContext("2d"); //All canvas drawings are done through a context.
 	context.fillStyle = "white"; //Set the fill style of closed shapes on the canvas to white.
 	context.beginPath(); //This starts a path with which lines can be drawn.
+
+	canvas.addEventListener("mousedown", canvasClicked);
+	canvas.addEventListener("mouseup", canvasReleased);
+	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -568,6 +576,30 @@ function toggleScanning() {
 function manualFit(scan) {
 	//Honestly, I don't even know if I'm going to do this.
 	//I want to talk to someone else about the idea before I do it.
+}
+function mouseMoved(event) {
+	currentMouseCoords[0] = event.clientX;
+	currentMouseCoords[1] = event.clientY;
+	//dataArea.innerHTML = "(" + currentMouseCoords[0] + ", " + currentMouseCoords[1] + ")<br>" + dataArea.innerHTML;
+	if(wasTheCanvasClicked) {
+		canvasDragged();
+	}
+}
+function canvasClicked() {
+	dataArea.innerHTML = "Canvas Clicked<br>" + dataArea.innerHTML;
+	wasTheCanvasClicked = true;
+	canvasClickedCoords = currentMouseCoords.slice(0);
+}
+function canvasReleased() {
+	dataArea.innerHTML = "Canvas Released<br>" + dataArea.innerHTML;
+	wasTheCanvasClicked = false;
+	canvasClickedCoords = [0, 0];
+}
+function canvasDragged() {
+	var canvasDragOffset = [];
+	canvasDragOffset[0] = currentMouseCoords[0] - canvasClickedCoords[0];
+	canvasDragOffset[1] = currentMouseCoords[1] - canvasClickedCoords[1];
+	dataArea.innerHTML = "(" + canvasDragOffset[0] + ", " + canvasDragOffset[1] + ")<br>" + dataArea.innerHTML;
 }
 
 //This actually sets it up so if you click "setup", the program starts.
