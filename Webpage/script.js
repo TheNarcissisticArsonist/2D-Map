@@ -32,6 +32,7 @@ var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
 var numFailedScans = 0; //How many scans have failed in a row.
+var maxNumFailedScans = 10; //How many scans have to fail in a row to go to user-manual fit.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 function setup() {
@@ -218,7 +219,12 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 
 	if(scanRecord.length > 0) {
 		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
-		cleanGlobalXYList = runICP(cleanGlobalXYList);
+		//if(numFailedScans < maxNumFailedScans) {
+			cleanGlobalXYList = runICP(cleanGlobalXYList);
+		//}
+		//else {
+		//	manualFit(cleanGlobalXYList);
+		//}
 	}
 
 	reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
@@ -558,6 +564,10 @@ function removeDuplicates(scan) {
 function stopScanning() {
 	currentlyScanning = false;
 	//This allows you to still zoom in and out on the map when the map is paused.
+}
+function manualFit(scan) {
+	//Honestly, I don't even know if I'm going to do this.
+	//I want to talk to someone else about the idea before I do it.
 }
 
 //This actually sets it up so if you click "setup", the program starts.
