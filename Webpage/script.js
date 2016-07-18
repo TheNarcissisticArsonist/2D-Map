@@ -19,10 +19,10 @@ var scanRangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
 var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
-var positionTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
+var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
-var icpNoMovementCounterThreshold = 3; //ICP must lead to no movement at least this many times for it to finish.
+var icpNoMovementCounterThreshold = 6; //ICP must lead to no movement at least this many times for it to finish.
 var numberOfScansToCompare = 5; //How many scans are used for comparison when using ICP.
 var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
@@ -107,14 +107,16 @@ function notCurrentlyScanning(data) {
 function normalMainLoop(formatted) {
 	//console.log("Main loop!");
 
+	console.log(positionOffset);
+
 	var robotPositionXYZ = getPositionFromFormattedMessage(formatted);
 	var quaternion = getQuaternionFromFormattedMessage(formatted);
 	var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses.
 
 	//This offsets the position and orientation by the stored error.
-	var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
-	var robotPosition = numeric.dot(robotPositionXYZ.slice(0, 2), positionTransformOffset);
-	//robotPosition = numeric.sub(robotPosition, positionOffset);
+	var robotOrientationTheta = eulerAngles[eulerAngleUsed] + angleOffset;
+	var robotPosition = numeric.dot(robotPositionXYZ.slice(0, 2), rotationTransformOffset);
+	robotPosition = numeric.add(robotPosition, positionOffset);
 
 	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
 	
@@ -399,7 +401,7 @@ function runICP(scan) {
 	while(!finished) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
-			console.log("Fail!");
+		//	console.log("Fail!");
 			++numFailedScans;
 			currentScan = [];
 			scanAngleError = 0;
@@ -430,16 +432,16 @@ function runICP(scan) {
 
 		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
 			++icpLoopCounter;
-			console.log("Good scan! " + iterationAverageDistance);
+		//	console.log("Good scan! " + iterationAverageDistance);
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
-				console.log("Success!");
+		//		console.log("Success!");
 				numFailedScans = 0;
 			}
 		}
 		else {
 			icpLoopCounter = 0;
-			console.log("           " + iterationAverageDistance);
+		//	console.log("           " + iterationAverageDistance);
 		}
 		
 		scanAngleError += angle;
@@ -447,12 +449,12 @@ function runICP(scan) {
 		scanTransformError = numeric.dot(scanTransformError, rotationMatrix);
 	}
 
-	console.log("Angle error: " + scanAngleError);
-	console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
+	//console.log("Angle error: " + scanAngleError);
+	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
-	angleOffset -= scanAngleError;
-	positionTransformOffset = numeric.dot(positionTransformOffset, scanTransformError);
-	positionOffset = numeric.sub(positionOffset, scanPositionError);
+	angleOffset += scanAngleError;
+	rotationTransformOffset = numeric.dot(rotationTransformOffset, scanTransformError);
+	positionOffset = numeric.add(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
@@ -537,7 +539,7 @@ function matchPoints(set1, set2) {
 	var indexPairs = [];
 	
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) < 10) {
+		if(Math.floor(Math.random() * 100) < 50) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=set1.length - 1; j>=0; --j) {
