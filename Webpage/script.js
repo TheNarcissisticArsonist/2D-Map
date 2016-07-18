@@ -404,11 +404,11 @@ function runICP(scan) {
 				finished = true;
 				console.log("Success!");
 			}
-			//console.log("Good scan! " + iterationAverageDistance);
+			console.log("Good scan! " + iterationAverageDistance);
 		}
 		else {
 			icpLoopCounter = 0;
-			//console.log("           " + iterationAverageDistance);
+			console.log("           " + iterationAverageDistance);
 		}
 		
 		scanAngleError += angle;
@@ -503,27 +503,22 @@ function ICP(set1, set2) {
 function matchPoints(set1, set2) {
 	var indexPairs = [];
 	
-	//percentToMatch should be between 0 and 100.
-	var numToMatch = set2.length / 25;
-
-	while(indexPairs.length <= numToMatch) {
-		for(var i=0; i<set2.length; ++i) {
-			if(Math.floor(Math.random() * 100) < 100 * (1/25)) {
-				var smallestDistance = Infinity;
-				var smallestDistanceIndex;
-				for(var j=set1.length - 1; j>=0; --j) {
-					d = distance(set2[i], set1[j]);
-					if(d < smallestDistance) {
-						smallestDistance = d;
-						smallestDistanceIndex = j;
-					}
-					if(d < goodCorrespondenceThreshold) {
-						break;
-					}
+	for(var i=0; i<set2.length; ++i) {
+		if(Math.floor(Math.random() * 100) < 6) {
+			var smallestDistance = Infinity;
+			var smallestDistanceIndex;
+			for(var j=set1.length - 1; j>=0; --j) {
+				d = distance(set2[i], set1[j]);
+				if(d < smallestDistance) {
+					smallestDistance = d;
+					smallestDistanceIndex = j;
 				}
-				if(smallestDistance < maximumPointMatchDistance) {
-					indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
+				if(d < goodCorrespondenceThreshold) {
+					break;
 				}
+			}
+			if(smallestDistance < maximumPointMatchDistance) {
+				indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
 			}
 		}
 	}
