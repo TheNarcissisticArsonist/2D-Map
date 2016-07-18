@@ -37,6 +37,7 @@ var currentMouseCoords = [0, 0]; //The current coordinates of the mouse.
 var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked.
 var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
+var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 function setup() {
@@ -50,6 +51,7 @@ function setup() {
 
 	canvas.addEventListener("mousedown", canvasClicked);
 	canvas.addEventListener("mouseup", canvasReleased);
+	canvas.addEventListener("mouseleave", canvasReleased);
 	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
@@ -69,6 +71,7 @@ function mainLoop(data) {
 
 	if(!currentlyScanning) {
 		notCurrentlyScanning(data);
+		return;
 	}
 	else if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //I.e., the data is correct...
 		normalMainLoop(formattedMessage);
@@ -94,10 +97,11 @@ function notCurrentlyScanning(data) {
 	context.lineWidth = 1 / scaleFactor;
 	clearCanvas();
 	setConstantCanvasTransforms();
-	drawRobotMarker();
 	setCanvasTransforms(robotPosition, robotOrientationTheta);
+	context.translate(overallCanvasDrag[1], -overallCanvasDrag[0]);
 	drawRobotPath();
 	drawRobotMap();
+	requestAnimationFrame(function() { mainLoop(""); });
 }
 function normalMainLoop(formatted) {
 	//console.log("Main loop!");
@@ -571,6 +575,8 @@ function removeDuplicates(scan) {
 }
 function toggleScanning() {
 	currentlyScanning = !currentlyScanning;
+	overallCanvasDrag = [0, 0];
+	lastOverallCanvasDrag = [0, 0];
 	//This allows you to still zoom in and out on the map when the map is paused.
 }
 function manualFit(scan) {
@@ -586,20 +592,23 @@ function mouseMoved(event) {
 	}
 }
 function canvasClicked() {
-	dataArea.innerHTML = "Canvas Clicked<br>" + dataArea.innerHTML;
 	wasTheCanvasClicked = true;
 	canvasClickedCoords = currentMouseCoords.slice(0);
 }
 function canvasReleased() {
-	dataArea.innerHTML = "Canvas Released<br>" + dataArea.innerHTML;
 	wasTheCanvasClicked = false;
 	canvasClickedCoords = [0, 0];
+	
+	lastOverallCanvasDrag[0] = overallCanvasDrag[0];
+	lastOverallCanvasDrag[1] = overallCanvasDrag[1];
 }
 function canvasDragged() {
 	var canvasDragOffset = [];
 	canvasDragOffset[0] = currentMouseCoords[0] - canvasClickedCoords[0];
 	canvasDragOffset[1] = currentMouseCoords[1] - canvasClickedCoords[1];
-	dataArea.innerHTML = "(" + canvasDragOffset[0] + ", " + canvasDragOffset[1] + ")<br>" + dataArea.innerHTML;
+
+	overallCanvasDrag[0] = (canvasDragOffset[0] / scaleFactor) + lastOverallCanvasDrag[0];
+	overallCanvasDrag[1] = (-1 * canvasDragOffset[1] / scaleFactor) + lastOverallCanvasDrag[1];
 }
 
 //This actually sets it up so if you click "setup", the program starts.
