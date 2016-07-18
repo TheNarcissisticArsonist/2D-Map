@@ -411,6 +411,7 @@ function runICP(scan) {
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
 				console.log("Success!");
+				numFailedScans = 0;
 			}
 			console.log("Good scan! " + iterationAverageDistance);
 		}
