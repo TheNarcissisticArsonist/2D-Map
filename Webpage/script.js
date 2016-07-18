@@ -561,8 +561,8 @@ function removeDuplicates(scan) {
 	}
 	return scan;
 }
-function stopScanning() {
-	currentlyScanning = false;
+function toggleScanning() {
+	currentlyScanning = !currentlyScanning;
 	//This allows you to still zoom in and out on the map when the map is paused.
 }
 function manualFit(scan) {
@@ -579,4 +579,4 @@ enterZoomTextArea = document.getElementById("youSetZoom");
 enterZoomButton = document.getElementById("enterZoom");
 enterZoomButton.addEventListener("click", enterZoom);
 document.getElementById("saveScan").addEventListener("click", saveScan);
-document.getElementById("stopScanning").addEventListener("click", stopScanning);
+document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
