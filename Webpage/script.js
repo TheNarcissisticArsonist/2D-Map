@@ -98,8 +98,8 @@ function notCurrentlyScanning(data) {
 	context.lineWidth = 1 / scaleFactor;
 	clearCanvas();
 	setConstantCanvasTransforms();
-	setCanvasTransforms(robotPosition, robotOrientationTheta);
 	context.translate(overallCanvasDrag[1], -overallCanvasDrag[0]);
+	setCanvasTransforms(robotPosition, robotOrientationTheta);
 	drawRobotPath();
 	drawRobotMap();
 	requestAnimationFrame(function() { mainLoop(""); });
@@ -114,7 +114,7 @@ function normalMainLoop(formatted) {
 	//This offsets the position and orientation by the stored error.
 	var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
 	var robotPosition = numeric.dot(robotPositionXYZ.slice(0, 2), positionTransformOffset);
-	robotPosition = numeric.sub(robotPosition, positionOffset);
+	//robotPosition = numeric.sub(robotPosition, positionOffset);
 
 	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
 	
@@ -430,12 +430,12 @@ function runICP(scan) {
 
 		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
 			++icpLoopCounter;
+			console.log("Good scan! " + iterationAverageDistance);
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
 				console.log("Success!");
 				numFailedScans = 0;
 			}
-			console.log("Good scan! " + iterationAverageDistance);
 		}
 		else {
 			icpLoopCounter = 0;
@@ -447,8 +447,8 @@ function runICP(scan) {
 		scanTransformError = numeric.dot(scanTransformError, rotationMatrix);
 	}
 
-	//console.log("Angle error: " + scanAngleError);
-	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
+	console.log("Angle error: " + scanAngleError);
+	console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
 	angleOffset -= scanAngleError;
 	positionTransformOffset = numeric.dot(positionTransformOffset, scanTransformError);
@@ -537,7 +537,7 @@ function matchPoints(set1, set2) {
 	var indexPairs = [];
 	
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) < 6) {
+		if(Math.floor(Math.random() * 100) < 10) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=set1.length - 1; j>=0; --j) {
