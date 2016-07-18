@@ -31,6 +31,7 @@ var goodCorrespondenceThreshold = 0.01; //If during point matching, the distance
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
+var numFailedScans = 0; //How many scans have failed in a row.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 function setup() {
@@ -55,72 +56,78 @@ function setup() {
 	}
 }
 function mainLoop(data) {
+	var formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
+
 	if(!currentlyScanning) {
-		//This section of code can be activated by clicking the button to stop scanning on the webpage.
-		//It allows you to zoom in and out, without taking new scans. Since ICP isn't being run, it renders much more quickly.
-		console.log("Not currently scanning.");
-
-		//These are saved, to keep the screen centered on where the robot would be. I may rework this later.
-		var robotPosition = lastPosition;
-		var robotOrientationTheta = lastAngle;
-
-		context.lineWidth = 1 / scaleFactor;
-		clearCanvas();
-		setConstantCanvasTransforms();
-		drawRobotMarker();
-		setCanvasTransforms(robotPosition, robotOrientationTheta);
-		drawRobotPath();
-		drawRobotMap();
-
-		requestAnimationFrame(mainLoop);
-		return;
+		notCurrentlyScanning(data);
 	}
-
-	formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
-
-	if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //I.e., the data is correct...
-		//console.log("Main loop!");
-
-		var robotPositionXYZ = getPositionFromFormattedMessage(formattedMessage);
-		var quaternion = getQuaternionFromFormattedMessage(formattedMessage);
-		var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses.
-
-		//This offsets the position and orientation by the stored error.
-		var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
-		var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset);
-
-		lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
-		
-		var scanDataFormatted = cleanUpScanData(formattedMessage[scanThetaMinIndex], formattedMessage[scanThetaMaxIndex], formattedMessage[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
-		var scanThetaMin = scanDataFormatted[0];
-		var scanThetaMax = scanDataFormatted[1];
-		var scanRangeList = scanDataFormatted[2];
-		var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
-
-		storePosition(robotPosition); //This appends the robotPosition to the pointsRecord array, and does absolutely nothing else (yet).
-		processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
-
-		context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
-
-		clearCanvas();
-		setConstantCanvasTransforms();
-		drawRobotMarker();
-		setCanvasTransforms(robotPosition, robotOrientationTheta);
-		drawRobotPath();
-		drawRobotMap();
+	else if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //I.e., the data is correct...
+		normalMainLoop(formattedMessage);
 	}
 	else {
-		if(formattedMessage[0] == "OLD" || formattedMessage[formattedMessage.length - 1] == "OLD") {
-			//console.log("Error! The message is of an unexpected format! (Old data)");
-		}
-		else {
-			console.log("Error! The message is of an unexpected format!\n" + formattedMessage); //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.k
-		}
+		badDataMainLoop(formattedMessage);
 	}
 
 	requestAnimationFrame(sendDataRequest);
 	//This sends a data request again, so the server will send the next piece of data, thereby calling the main loop again.
 	//requestAnimationFrame is used so the browser has time to catch up.
+}
+
+function notCurrentlyScanning(data) {
+	//This section of code can be activated by clicking the button to stop scanning on the webpage.
+	//It allows you to zoom in and out, without taking new scans. Since ICP isn't being run, it renders much more quickly.
+	console.log("Not currently scanning.");
+
+	//These are saved, to keep the screen centered on where the robot would be. I may rework this later.
+	var robotPosition = lastPosition;
+	var robotOrientationTheta = lastAngle;
+
+	context.lineWidth = 1 / scaleFactor;
+	clearCanvas();
+	setConstantCanvasTransforms();
+	drawRobotMarker();
+	setCanvasTransforms(robotPosition, robotOrientationTheta);
+	drawRobotPath();
+	drawRobotMap();
+}
+function normalMainLoop(formatted) {
+	//console.log("Main loop!");
+
+	var robotPositionXYZ = getPositionFromFormattedMessage(formatted);
+	var quaternion = getQuaternionFromFormattedMessage(formatted);
+	var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses.
+
+	//This offsets the position and orientation by the stored error.
+	var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
+	var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset);
+
+	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
+	
+	var scanDataFormatted = cleanUpScanData(formatted[scanThetaMinIndex], formatted[scanThetaMaxIndex], formatted[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
+	var scanThetaMin = scanDataFormatted[0];
+	var scanThetaMax = scanDataFormatted[1];
+	var scanRangeList = scanDataFormatted[2];
+	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
+
+	storePosition(robotPosition); //This appends the robotPosition to the pointsRecord array, and does absolutely nothing else (yet).
+	processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
+
+	context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
+
+	clearCanvas();
+	setConstantCanvasTransforms();
+	drawRobotMarker();
+	setCanvasTransforms(robotPosition, robotOrientationTheta);
+	drawRobotPath();
+	drawRobotMap();
+}
+function badDataMainLoop(formatted) {
+	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") {
+		//console.log("Error! The message is of an unexpected format! (Old data)");
+	}
+	else {
+		console.log("Error! The message is of an unexpected format!\n" + formatted); //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.k
+	}
 }
 
 function formatRawMessage(raw) { //This takes the raw message and formats it in a way that the data can be accessed more easily.
@@ -372,6 +379,7 @@ function runICP(scan) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
 			console.log("Fail!");
+			++numFailedScans;
 			currentScan = [];
 			scanAngleError = 0;
 			scanPositionError = [0, 0];
