@@ -8,10 +8,10 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 						//0 is roll, 1 is pitch, 2 is yaw.
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
-var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
+var scaleFactorMultiplier = 100; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
-var scaleFactor = 50; //As the path and information get bigger, it's useful to zoom out.
+var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
 var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
@@ -19,6 +19,7 @@ var scanRangeListIndex = 44; //Same, but for the list of ranges.
 var saveThisScan = false; //If true, the next scan will be saved.
 var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
+var positionTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
 var icpNoMovementCounterThreshold = 3; //ICP must lead to no movement at least this many times for it to finish.
@@ -27,7 +28,7 @@ var scanDensityDistance = 0.01; //In meters, the minimum significant distance be
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
-var goodCorrespondenceThreshold = 0.01; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
+var goodCorrespondenceThreshold = -1; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
@@ -112,7 +113,8 @@ function normalMainLoop(formatted) {
 
 	//This offsets the position and orientation by the stored error.
 	var robotOrientationTheta = eulerAngles[eulerAngleUsed] - angleOffset;
-	var robotPosition = numeric.sub(robotPositionXYZ.slice(0, 2), positionOffset);
+	var robotPosition = numeric.dot(robotPositionXYZ.slice(0, 2), positionTransformOffset);
+	robotPosition = numeric.sub(robotPosition, positionOffset);
 
 	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
 	
@@ -384,6 +386,7 @@ function runICP(scan) {
 	var totalLoopCount = 0;
 	var scanAngleError = 0;
 	var scanPositionError = [0, 0];
+	var scanTransformError = [[1, 0], [0, 1]];
 
 	for(var i=0; i<scan.length; ++i) {
 		currentScan.push(scan[i]);
@@ -401,6 +404,7 @@ function runICP(scan) {
 			currentScan = [];
 			scanAngleError = 0;
 			scanPositionError = [0, 0];
+			scanTransformError = [[1, 0], [0, 1]];
 			break;
 		}
 		iterationTotalDistance = 0;
@@ -440,12 +444,14 @@ function runICP(scan) {
 		
 		scanAngleError += angle;
 		scanPositionError = numeric.add(scanPositionError, translation);
+		scanTransformError = numeric.dot(scanTransformError, rotationMatrix);
 	}
 
 	//console.log("Angle error: " + scanAngleError);
 	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
 	angleOffset -= scanAngleError;
+	positionTransformOffset = numeric.dot(positionTransformOffset, scanTransformError);
 	positionOffset = numeric.sub(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");

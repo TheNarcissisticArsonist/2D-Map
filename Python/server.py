@@ -50,12 +50,12 @@ server.listen(5)
 def odomCallback(data):
 	global lastOdomMessage
 	lastOdomMessage = data.__str__() #data.__str__() formats the message as string so it can
-	print "Received odom data!\n\n"
+	print "Received odom data!"
 
 def laserCallback(data):
 	global lastLaserMessage
 	lastLaserMessage = data.__str__()
-	print "Received scan data!\n\n"
+	print "Received scan data!"
 
 # This code creates the subscriber node
 def odomListener():
