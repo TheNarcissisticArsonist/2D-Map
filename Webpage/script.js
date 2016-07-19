@@ -25,7 +25,7 @@ var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled 
 var icpNoMovementCounterThreshold = 5; //ICP must lead to no movement at least this many times for it to finish.
 var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
-var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
+var minICPComparePoints = 3000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
 var goodCorrespondenceThreshold = -1; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
@@ -38,6 +38,7 @@ var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked
 var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
+var mapIncrement = 5; //What fraction of scans to display on the map.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -114,7 +115,7 @@ function normalMainLoop(formatted) {
 
 	//This offsets the position and orientation by the stored error.
 	var robotOrientationTheta = eulerAngles[eulerAngleUsed] + angleOffset;
-	var robotPosition = numeric.dot(robotPositionXYZ.slice(0, 2), rotationTransformOffset);
+	var robotPosition = numeric.dot(rotationTransformOffset, robotPositionXYZ.slice(0, 2));
 	robotPosition = numeric.add(robotPosition, positionOffset);
 
 	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
@@ -353,7 +354,7 @@ function drawRobotPath() {
 function drawRobotMap() {
 	context.strokeStyle = "#aa0000";
 	context.beginPath();
-	for(var i=0; i<scanRecord.length; ++i) {
+	for(var i=0; i<scanRecord.length; i+=mapIncrement) {
 		scan = scanRecord[i];
 		context.moveTo(scan[0][0], scan[0][1]);
 		context.beginPath();
@@ -451,9 +452,9 @@ function runICP(scan) {
 	//console.log("Angle error: " + scanAngleError);
 	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
-	//angleOffset += scanAngleError;
-	//rotationTransformOffset = numeric.dot(rotationTransformOffset, scanTransformError);
-	//positionOffset = numeric.add(positionOffset, scanPositionError);
+	angleOffset += scanAngleError;
+	rotationTransformOffset = numeric.dot(rotationTransformOffset, scanTransformError);
+	positionOffset = numeric.add(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
@@ -538,7 +539,7 @@ function matchPoints(set1, set2) {
 	var indexPairs = [];
 	
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) < 6) {
+		if(Math.floor(Math.random() * 100) < 10) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=set1.length - 1; j>=0; --j) {
