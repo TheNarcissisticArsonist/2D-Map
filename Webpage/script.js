@@ -22,8 +22,7 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
-var icpNoMovementCounterThreshold = 6; //ICP must lead to no movement at least this many times for it to finish.
-var numberOfScansToCompare = 5; //How many scans are used for comparison when using ICP.
+var icpNoMovementCounterThreshold = 5; //ICP must lead to no movement at least this many times for it to finish.
 var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 1000; //The minimum number of points ICP must use to compare.
@@ -41,6 +40,7 @@ var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you 
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
+
 function setup() {
 	console.log("Running setup function.");
 
@@ -106,8 +106,7 @@ function notCurrentlyScanning(data) {
 }
 function normalMainLoop(formatted) {
 	//console.log("Main loop!");
-
-	console.log(positionOffset);
+	//console.log(positionOffset);
 
 	var robotPositionXYZ = getPositionFromFormattedMessage(formatted);
 	var quaternion = getQuaternionFromFormattedMessage(formatted);
@@ -401,7 +400,7 @@ function runICP(scan) {
 	while(!finished) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
-		//	console.log("Fail!");
+			console.log("Fail!");
 			++numFailedScans;
 			currentScan = [];
 			scanAngleError = 0;
@@ -435,7 +434,7 @@ function runICP(scan) {
 		//	console.log("Good scan! " + iterationAverageDistance);
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
 				finished = true;
-		//		console.log("Success!");
+				console.log("Success! " + totalLoopCount);
 				numFailedScans = 0;
 			}
 		}
@@ -452,9 +451,9 @@ function runICP(scan) {
 	//console.log("Angle error: " + scanAngleError);
 	//console.log("Position error: " + scanPositionError[0] + ", " + scanPositionError[1]);
 
-	angleOffset += scanAngleError;
-	rotationTransformOffset = numeric.dot(rotationTransformOffset, scanTransformError);
-	positionOffset = numeric.add(positionOffset, scanPositionError);
+	//angleOffset += scanAngleError;
+	//rotationTransformOffset = numeric.dot(rotationTransformOffset, scanTransformError);
+	//positionOffset = numeric.add(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
 
@@ -539,7 +538,7 @@ function matchPoints(set1, set2) {
 	var indexPairs = [];
 	
 	for(var i=0; i<set2.length; ++i) {
-		if(Math.floor(Math.random() * 100) < 50) {
+		if(Math.floor(Math.random() * 100) < 6) {
 			var smallestDistance = Infinity;
 			var smallestDistanceIndex;
 			for(var j=set1.length - 1; j>=0; --j) {
