@@ -43,7 +43,7 @@ var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 var mapIncrement = 5; //What fraction of scans to display on the map.
-var zoomScrollConstant = 120; //How much a scroll is divided by when zooming in or out.
+var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
@@ -627,8 +627,12 @@ function canvasDragged() {
 	overallCanvasDrag[1] = (-1 * canvasDragOffset[1] / scaleFactor) + lastOverallCanvasDrag[1];
 }
 function zoomed(e) {
-	var delta = e.wheelDelta;
-	var zoomMultiplier = Math.pow(2, delta/zoomScrollConstant);
+	if(scanRecord.length == 0) {
+		//Don't zoom if there's nothing to see.
+		return;
+	}
+
+	var zoomMultiplier = Math.pow(2, e.wheelDelta/zoomScrollConstant); //Raising 2 to the power of wheelDelta changes it from a positive/negative number to a number that is greater than or less than 1, and so it's fit for a scale factor.
 	scaleFactor *= zoomMultiplier;
 }
 
