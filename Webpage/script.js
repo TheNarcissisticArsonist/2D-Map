@@ -353,9 +353,10 @@ function drawRobotPath() {
 	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
 	for(var i=1; i<pointsRecord.length; ++i) {
 		context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
-		context.stroke();
-		lastPosition = [pointsRecord[i][0], pointsRecord[i][1]];
 	}
+	var lastIndex = pointsRecord.length - 1;
+	lastPosition = [pointsRecord[lastIndex][0], pointsRecord[lastIndex][1]];
+	context.stroke();
 	context.strokeStyle = "#000000";
 	context.beginPath();
 }
@@ -368,15 +369,16 @@ function drawRobotMap() {
 		context.beginPath();
 		for(var j=1; j<scan.length; ++j) {
 			if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThresholdSquared) {
+				context.stroke();
 				context.moveTo(scan[j][0], scan[j][1]);
 				context.beginPath();
 			}
 			else {
 				context.lineTo(scan[j][0], scan[j][1]);
-				context.stroke();
 			}
 		}
 	}
+	context.stroke();
 	context.strokeStyle = "#000000";
 	context.beginPath();
 }
