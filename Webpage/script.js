@@ -43,11 +43,15 @@ var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 var mapIncrement = 5; //What fraction of scans to display on the map.
+var zoomScrollConstant = 120; //How much a scroll is divided by when zooming in or out.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
 
 function setup() {
 	console.log("Running setup function.");
+
+	document.getElementById("saveScan").addEventListener("click", saveScan);
+	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
 
 	canvas = document.getElementById("mainCanvas"); //Grab the HTML canvas element.
 	canvas.style.transform = "matrix(0, -1, 1, 0, 0, 0)"; //Rotate the canvas so up is forward, like in a map.
@@ -58,6 +62,7 @@ function setup() {
 	canvas.addEventListener("mousedown", canvasClicked);
 	canvas.addEventListener("mouseup", canvasReleased);
 	canvas.addEventListener("mouseleave", canvasReleased);
+	canvas.addEventListener("mousewheel", function(event) {zoomed(event);});
 	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
@@ -621,6 +626,11 @@ function canvasDragged() {
 	overallCanvasDrag[0] = (canvasDragOffset[0] / scaleFactor) + lastOverallCanvasDrag[0];
 	overallCanvasDrag[1] = (-1 * canvasDragOffset[1] / scaleFactor) + lastOverallCanvasDrag[1];
 }
+function zoomed(e) {
+	var delta = e.wheelDelta;
+	var zoomMultiplier = Math.pow(2, delta/zoomScrollConstant);
+	scaleFactor *= zoomMultiplier;
+}
 
 //This actually sets it up so if you click "setup", the program starts.
 startButton = document.getElementById("start");
@@ -630,5 +640,3 @@ startButton.addEventListener("click", setup);
 enterZoomTextArea = document.getElementById("youSetZoom");
 enterZoomButton = document.getElementById("enterZoom");
 enterZoomButton.addEventListener("click", enterZoom);
-document.getElementById("saveScan").addEventListener("click", saveScan);
-document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
