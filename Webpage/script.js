@@ -10,6 +10,7 @@ var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's l
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
+var distanceDisplayThresholdSquared = Math.pow(distanceDisplayThreshold, 2); //It's squared so it can be used with distanceSquared.
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
 var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
@@ -22,12 +23,15 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
+var icpAverageDistanceTraveledThresholdSquared = Math.pow(icpAverageDistanceTraveledThreshold, 2); //This is squared for use with the distanceSquared function.
 var icpNoMovementCounterThreshold = 5; //ICP must lead to no movement at least this many times for it to finish.
 var scanDensityDistance = 0.01; //In meters, the minimum significant distance between two points.
+var scanDensityDistanceSquared = Math.pow(scanDensityDistance, 2); //For use with distanceSquared.
 var maxICPLoopCount = 250; //The maximum number of times ICP can run.
 var minICPComparePoints = 3000; //The minimum number of points ICP must use to compare.
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
-var goodCorrespondenceThreshold = -1; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
+var goodCorrespondenceThreshold = 0; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
+var goodCorrespondenceThresholdSquared = Math.pow(goodCorrespondenceThreshold, 2); //If this is to be implemented
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
@@ -286,7 +290,7 @@ function removeScanNaN(scanList) {
 }
 function distance(pointA, pointB) {
 	//This is just an implementation of the distance formula.
-	return Math.sqrt(Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2));
+	return Math.sqrt(distanceSquared(pointA, pointB));
 }
 function distanceSquared(pointA, pointB) {
 	//This is the distance formula without the square root. When simply comparing to a constant, this is faster, as you can just square the constant.
@@ -358,7 +362,7 @@ function drawRobotMap() {
 		context.moveTo(scan[0][0], scan[0][1]);
 		context.beginPath();
 		for(var j=1; j<scan.length; ++j) {
-			if(distance([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThreshold) {
+			if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThresholdSquared) {
 				context.moveTo(scan[j][0], scan[j][1]);
 				context.beginPath();
 			}
@@ -375,8 +379,8 @@ function runICP(scan) {
 	var currentScan = [];
 	var knownPoints = [];
 	var finished = false;
-	var iterationTotalDistance = 0;
-	var iterationAverageDistance = 0;
+	var iterationTotalSquaredDistance = 0;
+	var iterationAverageSquaredDistance = 0;
 	var rotationMatrix, translation, icpFunctionOutput;
 	var angle = 0;
 	var pointPairs = [];
@@ -408,7 +412,7 @@ function runICP(scan) {
 			scanTransformError = [[1, 0], [0, 1]];
 			break;
 		}
-		iterationTotalDistance = 0;
+		iterationTotalSquaredDistance = 0;
 		pointSet1 = [];
 		pointSet2 = [];
 
@@ -425,11 +429,11 @@ function runICP(scan) {
 		for(var i=0; i<currentScan.length; ++i) {
 			oldScanPoints[i] = currentScan[i];
 			currentScan[i] = numeric.add(numeric.dot(rotationMatrix, currentScan[i]), translation);
-			iterationTotalDistance += distance(oldScanPoints[i], currentScan[i]);
+			iterationTotalSquaredDistance += distanceSquared(oldScanPoints[i], currentScan[i]);
 		}
-		iterationAverageDistance = iterationTotalDistance / currentScan.length;
+		iterationAverageSquaredDistance = iterationTotalSquaredDistance / currentScan.length;
 
-		if(iterationAverageDistance < icpAverageDistanceTraveledThreshold) {
+		if(iterationAverageSquaredDistance < icpAverageDistanceTraveledThresholdSquared) {
 			++icpLoopCounter;
 		//	console.log("Good scan! " + iterationAverageDistance);
 			if(icpLoopCounter >= icpNoMovementCounterThreshold) {
@@ -539,20 +543,20 @@ function matchPoints(set1, set2) {
 	
 	for(var i=0; i<set2.length; ++i) {
 		if(Math.floor(Math.random() * 100) < 10) {
-			var smallestDistance = Infinity;
-			var smallestDistanceIndex;
+			var smallestSquaredDistance = Infinity;
+			var smallestSquaredDistanceIndex;
 			for(var j=set1.length - 1; j>=0; --j) {
-				d = distance(set2[i], set1[j]);
-				if(d < smallestDistance) {
-					smallestDistance = d;
-					smallestDistanceIndex = j;
+				d = distanceSquared(set2[i], set1[j]);
+				if(d < smallestSquaredDistance) {
+					smallestSquaredDistance = d;
+					smallestSquaredDistanceIndex = j;
 				}
-				if(d < goodCorrespondenceThreshold) {
+				if(d < goodCorrespondenceThresholdSquared) {
 					break;
 				}
 			}
-			if(smallestDistance < maximumPointMatchDistance) {
-				indexPairs.push([set2[i], set1[smallestDistanceIndex]]);
+			if(smallestSquaredDistance < maximumPointMatchDistance) {
+				indexPairs.push([set2[i], set1[smallestSquaredDistanceIndex]]);
 			}
 		}
 	}
@@ -568,8 +572,8 @@ function removeDuplicates(scan) {
 	for(var i=scan.length - 1; i>=0; --i) {
 		remove = false;
 		for(var j=0; j<allPoints.length; ++j) {
-			var d = distance(scan[i], allPoints[j]);
-			if(d < scanDensityDistance) {
+			var d = distanceSquared(scan[i], allPoints[j]);
+			if(d < scanDensityDistanceSquared) {
 				remove = true;
 				break;
 			}
