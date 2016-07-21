@@ -288,6 +288,10 @@ function distance(pointA, pointB) {
 	//This is just an implementation of the distance formula.
 	return Math.sqrt(Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2));
 }
+function distanceSquared(pointA, pointB) {
+	//This is the distance formula without the square root. When simply comparing to a constant, this is faster, as you can just square the constant.
+	return Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2);
+}
 function enterZoom() { //Change the scale factor based on user input.
 	rawFactor = enterZoomTextArea.value;
 	console.log(rawFactor);
@@ -338,18 +342,10 @@ function drawRobotPath() {
 	context.beginPath();
 	//This will draw a line from each point in the robot's path to the subsequent point.
 	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
-	var d;
 	for(var i=1; i<pointsRecord.length; ++i) {
-		d = distance([pointsRecord[i][0], pointsRecord[i][1]], [pointsRecord[i-1][0], pointsRecord[i-1][1]]);
-		if(distance > 0.05) {
-			context.moveTo(pointsRecord[i][0], pointsRecord[i][1]);
-			context.beginPath();
-		}
-		else {
-			context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
-			context.stroke();
-			lastPosition = [pointsRecord[i][0], pointsRecord[i][1]];
-		}
+		context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
+		context.stroke();
+		lastPosition = [pointsRecord[i][0], pointsRecord[i][1]];
 	}
 	context.strokeStyle = "#000000";
 	context.beginPath();
