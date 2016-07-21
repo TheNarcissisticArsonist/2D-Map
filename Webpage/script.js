@@ -8,7 +8,7 @@ var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation dat
 						//0 is roll, 1 is pitch, 2 is yaw.
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
-var scaleFactorMultiplier = 100; //This lets it default to 1 pixel = 2 cm.
+var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
@@ -253,9 +253,12 @@ function convertScanToRobotXY(min, max, rangeList, increment) {
 	var currentTheta, x, y;
 	var scan = [];
 	for(var i=0; i<rangeList.length; ++i) {
+		//This is basically converting a set of polar coordinates into cartesian coordinates, and then translating down 22 cm.
+		//The downwards translation is because the laser scanner on the robot is ~22 cm in front of the center of mass, which is what odometry uses.
 		currentTheta = min + (i * increment);
 		x = rangeList[i] * Math.cos(currentTheta);
 		y = rangeList[i] * Math.sin(currentTheta) * -1;
+		y -= 0.22;
 		scan.push([x, y]);
 	}
 	return scan;
