@@ -42,7 +42,9 @@ var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked
 var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
-var mapIncrement = 5; //What fraction of scans to display on the map.
+var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
+var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
+var mapIncrement = mapIncrementScanning; //What fraction of scans to display on the map.
 var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
@@ -267,7 +269,7 @@ function convertScanToRobotXY(min, max, rangeList, increment) {
 		currentTheta = min + (i * increment);
 		x = rangeList[i] * Math.cos(currentTheta);
 		y = rangeList[i] * Math.sin(currentTheta) * -1;
-		y -= 0.22;
+		x += 0.22;
 		scan.push([x, y]);
 	}
 	return scan;
@@ -592,10 +594,18 @@ function removeDuplicates(scan) {
 	return scan;
 }
 function toggleScanning() {
+	//This allows you to still zoom in and out on the map when the map is paused.
 	currentlyScanning = !currentlyScanning;
 	overallCanvasDrag = [0, 0];
 	lastOverallCanvasDrag = [0, 0];
-	//This allows you to still zoom in and out on the map when the map is paused.
+
+	//This makes sure all scans are displayed when not scanning, and a reduced number are displayed when scanning is happening, to make the program faster.
+	if(currentlyScanning) {
+		mapIncrement = mapIncrementScanning;
+	}
+	else {
+		mapIncrement = mapIncrementPretty;
+	}
 }
 function manualFit(scan) {
 	//Honestly, I don't even know if I'm going to do this.
