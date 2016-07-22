@@ -46,8 +46,12 @@ var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
 var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
 var mapIncrement = mapIncrementScanning; //What fraction of scans to display on the map.
 var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
+var wasTheRotateClicked = false; //This is self explanatory!
+var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
+var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
+var overallRotateDrag = 0; //Ditto the above.
 
-var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton; //These are global variables used for UI stuff.
+var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
 function setup() {
 	console.log("Running setup function.");
@@ -62,10 +66,11 @@ function setup() {
 	context.beginPath(); //This starts a path with which lines can be drawn.
 
 	canvas.addEventListener("mousedown", canvasClicked);
-	canvas.addEventListener("mouseup", canvasReleased);
-	canvas.addEventListener("mouseleave", canvasReleased);
 	canvas.addEventListener("mousewheel", function(event) {zoomed(event);});
+	outerCircle = document.getElementById("outerCircle");
+	outerCircle.addEventListener("mousedown", rotateClicked);
 	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
+	document.body.addEventListener("mouseup", clickReleased);
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -110,6 +115,7 @@ function notCurrentlyScanning(data) {
 	context.lineWidth = 1 / scaleFactor;
 	clearCanvas();
 	setConstantCanvasTransforms();
+	context.rotate(overallRotateDrag);
 	context.translate(overallCanvasDrag[1], -overallCanvasDrag[0]);
 	setCanvasTransforms(robotPosition, robotOrientationTheta);
 	drawRobotPath();
@@ -598,6 +604,8 @@ function toggleScanning() {
 	currentlyScanning = !currentlyScanning;
 	overallCanvasDrag = [0, 0];
 	lastOverallCanvasDrag = [0, 0];
+	overallRotateDrag = 0;
+	lastOverallRotateDrag = 0;
 
 	//This makes sure all scans are displayed when not scanning, and a reduced number are displayed when scanning is happening, to make the program faster.
 	if(currentlyScanning) {
@@ -613,10 +621,13 @@ function manualFit(scan) {
 }
 function mouseMoved(event) {
 	currentMouseCoords[0] = event.clientX;
-	currentMouseCoords[1] = event.clientY;
+	currentMouseCoords[1] = window.innerHeight - event.clientY;
 	//dataArea.innerHTML = "(" + currentMouseCoords[0] + ", " + currentMouseCoords[1] + ")<br>" + dataArea.innerHTML;
 	if(wasTheCanvasClicked) {
 		canvasDragged();
+	}
+	else if(wasTheRotateClicked) {
+		rotateDragged();
 	}
 }
 function canvasClicked() {
@@ -635,8 +646,39 @@ function canvasDragged() {
 	canvasDragOffset[0] = currentMouseCoords[0] - canvasClickedCoords[0];
 	canvasDragOffset[1] = currentMouseCoords[1] - canvasClickedCoords[1];
 
+	var transformMatrix = [[Math.cos(-overallRotateDrag), -Math.sin(-overallRotateDrag)], [Math.sin(-overallRotateDrag), Math.cos(-overallRotateDrag)]];
+	canvasDragOffset = numeric.dot(transformMatrix, canvasDragOffset);
+
 	overallCanvasDrag[0] = (canvasDragOffset[0] / scaleFactor) + lastOverallCanvasDrag[0];
-	overallCanvasDrag[1] = (-1 * canvasDragOffset[1] / scaleFactor) + lastOverallCanvasDrag[1];
+	overallCanvasDrag[1] = (canvasDragOffset[1] / scaleFactor) + lastOverallCanvasDrag[1];
+}
+function rotateClicked() {
+	var circleBoundingBox = outerCircle.getBoundingClientRect();
+	circleCenterCoords = [circleBoundingBox.left + (outerCircle.r.baseVal.value/2), window.innerHeight - circleBoundingBox.top - (outerCircle.r.baseVal.value/2)];
+	wasTheRotateClicked = true;
+	rotateClickedAngle = Math.PI + Math.atan2(currentMouseCoords[1] - circleCenterCoords[1], currentMouseCoords[0] - circleCenterCoords[0]);
+}
+function rotateReleased() {
+	wasTheRotateClicked = false;
+	rotateClickedAngle = 0;
+
+	lastOverallRotateDrag = overallRotateDrag;
+}
+function rotateDragged() {
+	var circleBoundingBox = outerCircle.getBoundingClientRect();
+	circleCenterCoords = [circleBoundingBox.left + (outerCircle.r.baseVal.value/2), window.innerHeight - circleBoundingBox.top - (outerCircle.r.baseVal.value/2)];
+	var newTheta = Math.PI + Math.atan2(currentMouseCoords[1] - circleCenterCoords[1], currentMouseCoords[0] - circleCenterCoords[0]);
+	var thetaOffset = newTheta - rotateClickedAngle;
+	overallRotateDrag = thetaOffset + lastOverallRotateDrag;
+	console.log(newTheta);
+}
+function clickReleased() {
+	if(wasTheCanvasClicked) {
+		canvasReleased();
+	}
+	else if(wasTheRotateClicked) {
+		rotateReleased();
+	}
 }
 function zoomed(e) {
 	if(scanRecord.length == 0) {
