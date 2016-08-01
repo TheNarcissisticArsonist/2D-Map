@@ -42,9 +42,8 @@ var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked
 var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
-var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
-var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
-var mapIncrement = mapIncrementScanning; //What fraction of scans to display on the map.
+var recentScansOnly = true; //When this is true, only recent scans will be shown, to speed up the program.
+var numRecentScans = 100; //How many scans to show when recentScansOnly is true.
 var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
 var wasTheRotateClicked = false; //This is self explanatory!
 var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
@@ -371,18 +370,24 @@ function drawRobotPath() {
 function drawRobotMap() {
 	context.strokeStyle = "#aa0000";
 	context.beginPath();
-	for(var i=0; i<scanRecord.length; i+=mapIncrement) {
-		scan = scanRecord[i];
-		context.moveTo(scan[0][0], scan[0][1]);
-		context.beginPath();
-		for(var j=1; j<scan.length; ++j) {
-			if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThresholdSquared) {
-				context.stroke();
-				context.moveTo(scan[j][0], scan[j][1]);
-				context.beginPath();
-			}
-			else {
-				context.lineTo(scan[j][0], scan[j][1]);
+	var startIndex = 0;
+	if(recentScansOnly) {
+		startIndex = scanRecord.length - numRecentScans;
+	}	
+	for(var i=startIndex; i<scanRecord.length; ++i) {
+		if(i >= 0) {
+			scan = scanRecord[i];
+			context.moveTo(scan[0][0], scan[0][1]);
+			context.beginPath();
+			for(var j=1; j<scan.length; ++j) {
+				if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThresholdSquared) {
+					context.stroke();
+					context.moveTo(scan[j][0], scan[j][1]);
+					context.beginPath();
+				}
+				else {
+					context.lineTo(scan[j][0], scan[j][1]);
+				}
 			}
 		}
 	}
@@ -608,12 +613,7 @@ function toggleScanning() {
 	lastOverallRotateDrag = 0;
 
 	//This makes sure all scans are displayed when not scanning, and a reduced number are displayed when scanning is happening, to make the program faster.
-	if(currentlyScanning) {
-		mapIncrement = mapIncrementScanning;
-	}
-	else {
-		mapIncrement = mapIncrementPretty;
-	}
+	recentScansOnly = currentlyScanning;
 }
 function manualFit(scan) {
 	//Honestly, I don't even know if I'm going to do this.
