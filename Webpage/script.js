@@ -11,9 +11,9 @@ var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var distanceDisplayThresholdSquared = Math.pow(distanceDisplayThreshold, 2); //It's squared so it can be used with distanceSquared.
-var pointsRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
+var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
-var scanRecord = []; //This is the list of laser scans. The indeces correspond with pointsRecord[]. //They're in x-y position format, the same as pointsRecord.
+var scanRecord = []; //This is the list of laser scans. The indeces correspond with positionRecord[]. //They're in x-y position format, the same as positionRecord.
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
 var scanRangeListIndex = 44; //Same, but for the list of ranges.
@@ -145,7 +145,7 @@ function normalMainLoop(formatted) {
 	var scanRangeList = scanDataFormatted[2];
 	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
 
-	storePosition(robotPosition); //This appends the robotPosition to the pointsRecord array, and does absolutely nothing else (yet).
+	storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 	processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
 
 	context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
@@ -243,7 +243,7 @@ function cleanUpScanData(min, max, rangeList) {
 	return [min, max, rangeList];
 }
 function storePosition(position) {
-	pointsRecord.push(position);
+	positionRecord.push(position);
 	//This is its own function because I might later want to downsample, or do some other manipulation on the point.
 }
 function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPosition, robotAngle) {
@@ -360,12 +360,12 @@ function drawRobotPath() {
 	context.strokeStyle = "#00aa00";
 	context.beginPath();
 	//This will draw a line from each point in the robot's path to the subsequent point.
-	context.moveTo(pointsRecord[0][0], pointsRecord[0][1]);
-	for(var i=1; i<pointsRecord.length; ++i) {
-		context.lineTo(pointsRecord[i][0], pointsRecord[i][1]);
+	context.moveTo(positionRecord[0][0], positionRecord[0][1]);
+	for(var i=1; i<positionRecord.length; ++i) {
+		context.lineTo(positionRecord[i][0], positionRecord[i][1]);
 	}
-	var lastIndex = pointsRecord.length - 1;
-	lastPosition = [pointsRecord[lastIndex][0], pointsRecord[lastIndex][1]];
+	var lastIndex = positionRecord.length - 1;
+	lastPosition = [positionRecord[lastIndex][0], positionRecord[lastIndex][1]];
 	context.stroke();
 	context.strokeStyle = "#000000";
 	context.beginPath();
