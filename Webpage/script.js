@@ -4,8 +4,7 @@ var webSocketPath = "/"; //The file path of the websocket.
 var formattedDataStringExpectedArrayLength = 46; //The expected length of the formatted data string from formatRawMessage().
 var formattedDataStringPositionIndeces = [10, 11, 12]; //The location of the xyz position data in the formatted data string.
 var formattedDataStringQuaternionIndeces = [14, 15, 16, 17]; //The location of the xyzw quaternion data in the formatted data string.
-var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation data, the Euler angle for the XY-plane can be unexpected.
-						//0 is roll, 1 is pitch, 2 is yaw.
+var eulerAngleUsed = 0; //Due to some weirdness with the robot's orientation data, the Euler angle for the XY-plane could be anything. 0 is roll, 1 is pitch, 2 is yaw.
 var robotMarkerRadius = 0.3; //The radius of the circle that marks the robot's location, in meters.
 var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing which direction the robot is pointing. This is the angle between the centerline and one of the sides.
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
@@ -13,7 +12,7 @@ var distanceDisplayThreshold = 0.1; //If the distance between two points in a sc
 var distanceDisplayThresholdSquared = Math.pow(distanceDisplayThreshold, 2); //It's squared so it can be used with distanceSquared.
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
 var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
-var scanRecord = []; //This is the list of laser scans. The indeces correspond with positionRecord[]. //They're in x-y position format, the same as positionRecord.
+var optimizedScanRecord = []; //This is the list of laser scans. The indeces correspond with positionRecord[]. They're in x-y position format, the same as positionRecord.
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
 var scanRangeListIndex = 44; //Same, but for the list of ranges.
@@ -52,6 +51,7 @@ var wasTheRotateClicked = false; //This is self explanatory!
 var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
 var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
 var overallRotateDrag = 0; //Ditto the above.
+var poses = []; //A list of poses to be used with loop closure.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
@@ -144,6 +144,9 @@ function normalMainLoop(formatted) {
 	var scanThetaMax = scanDataFormatted[1];
 	var scanRangeList = scanDataFormatted[2];
 	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
+
+	var currentPose = new pose(robotPosition, robotOrientationTheta, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList);
+	poses.push(currentPose);
 
 	storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 	processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
@@ -252,7 +255,7 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 	var globalXYList = convertRobotXYToGlobalXY(robotXYList, robotPosition, robotAngle);
 	var cleanGlobalXYList = removeScanNaN(globalXYList);
 
-	if(scanRecord.length > 0) {
+	if(optimizedScanRecord.length > 0) {
 		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
 		//if(numFailedScans < maxNumFailedScans) {
 			cleanGlobalXYList = runICP(cleanGlobalXYList);
@@ -265,7 +268,7 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 	reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
 
 	if(reducedGlobalXYList.length > 0) {
-		scanRecord.push(cleanGlobalXYList);
+		optimizedScanRecord.push(cleanGlobalXYList);
 	}
 }
 function convertScanToRobotXY(min, max, rangeList, increment) {
@@ -375,11 +378,11 @@ function drawRobotMap() {
 	context.beginPath();
 	var startIndex = 0;
 	if(recentScansOnly) {
-		startIndex = (scanRecord.length - numRecentScans) - (scanRecord.length % mapIncrement);
+		startIndex = (optimizedScanRecord.length - numRecentScans) - (optimizedScanRecord.length % mapIncrement);
 	}
-	for(var i=startIndex; i<scanRecord.length; i+=mapIncrement) {
+	for(var i=startIndex; i<optimizedScanRecord.length; i+=mapIncrement) {
 		if(i >= 0) {
-			scan = scanRecord[i];
+			scan = optimizedScanRecord[i];
 			context.moveTo(scan[0][0], scan[0][1]);
 			context.beginPath();
 			for(var j=1; j<scan.length; ++j) {
@@ -419,9 +422,9 @@ function runICP(scan) {
 	for(var i=0; i<scan.length; ++i) {
 		currentScan.push(scan[i]);
 	}
-	var i = scanRecord.length - 1;
+	var i = optimizedScanRecord.length - 1;
 	while(i >= 0 && knownPoints.length <= minICPComparePoints) {
-		knownPoints = knownPoints.concat(scanRecord[i]);
+		knownPoints = knownPoints.concat(optimizedScanRecord[i]);
 		--i;
 	}
 	while(!finished) {
@@ -589,8 +592,8 @@ function matchPoints(set1, set2) {
 function removeDuplicates(scan) {
 	var allPoints = [];
 	var remove = false;
-	for(var i=0; i<scanRecord.length; ++i) {
-		allPoints = allPoints.concat(scanRecord[i]);
+	for(var i=0; i<optimizedScanRecord.length; ++i) {
+		allPoints = allPoints.concat(optimizedScanRecord[i]);
 	}
 	for(var i=scan.length - 1; i>=0; --i) {
 		remove = false;
@@ -690,13 +693,21 @@ function clickReleased() {
 	}
 }
 function zoomed(e) {
-	if(scanRecord.length == 0) {
+	if(optimizedScanRecord.length == 0) {
 		//Don't zoom if there's nothing to see.
 		return;
 	}
 
 	var zoomMultiplier = Math.pow(2, e.wheelDelta/zoomScrollConstant); //Raising 2 to the power of wheelDelta changes it from a positive/negative number to a number that is greater than or less than 1, and so it's fit for a scale factor.
 	scaleFactor *= zoomMultiplier;
+}
+function pose(position, poseTheta, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
+	this.position = position;
+	this.poseTheta = poseTheta;
+	this.scanMinTheta = scanMinTheta;
+	this.scanMaxTheta = scanMaxTheta;
+	this.scanThetaIncrement = scanThetaIncrement;
+	this.scanRangeList = scanRangeList;
 }
 
 //This actually sets it up so if you click "setup", the program starts.
