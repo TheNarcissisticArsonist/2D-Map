@@ -44,6 +44,9 @@ var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you 
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 var recentScansOnly = true; //When this is true, only recent scans will be shown, to speed up the program.
 var numRecentScans = 100; //How many scans to show when recentScansOnly is true.
+var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
+var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
+var mapIncrement = mapIncrementScanning; //What fraction of scans to display on the map.
 var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
 var wasTheRotateClicked = false; //This is self explanatory!
 var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
@@ -372,9 +375,9 @@ function drawRobotMap() {
 	context.beginPath();
 	var startIndex = 0;
 	if(recentScansOnly) {
-		startIndex = scanRecord.length - numRecentScans;
-	}	
-	for(var i=startIndex; i<scanRecord.length; ++i) {
+		startIndex = (scanRecord.length - numRecentScans) - (scanRecord.length % mapIncrement);
+	}
+	for(var i=startIndex; i<scanRecord.length; i+=mapIncrement) {
 		if(i >= 0) {
 			scan = scanRecord[i];
 			context.moveTo(scan[0][0], scan[0][1]);
@@ -614,6 +617,12 @@ function toggleScanning() {
 
 	//This makes sure all scans are displayed when not scanning, and a reduced number are displayed when scanning is happening, to make the program faster.
 	recentScansOnly = currentlyScanning;
+	if(currentlyScanning) {
+		mapIncrement = mapIncrementScanning;
+	}
+	else {
+		mapIncrement = mapIncrementPretty;
+	}
 }
 function manualFit(scan) {
 	//Honestly, I don't even know if I'm going to do this.
