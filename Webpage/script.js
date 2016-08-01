@@ -52,6 +52,7 @@ var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
 var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
 var overallRotateDrag = 0; //Ditto the above.
 var poses = []; //A list of poses to be used with loop closure.
+var displayReductionIncrement = 2; //Every __ points in each scan are displayed while scanning.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
@@ -377,6 +378,7 @@ function drawRobotMap() {
 	context.strokeStyle = "#aa0000";
 	context.beginPath();
 	var startIndex = 0;
+	var jIncrement = currentlyScanning ? displayReductionIncrement : 1;
 	if(recentScansOnly) {
 		startIndex = (optimizedScanRecord.length - numRecentScans) - (optimizedScanRecord.length % mapIncrement);
 	}
@@ -385,8 +387,9 @@ function drawRobotMap() {
 			scan = optimizedScanRecord[i];
 			context.moveTo(scan[0][0], scan[0][1]);
 			context.beginPath();
-			for(var j=1; j<scan.length; ++j) {
-				if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-1][0], scan[j-1][1]]) > distanceDisplayThresholdSquared) {
+			for(var j=1; j<scan.length; j+=jIncrement) {
+				if(j-jIncrement < 0) {}
+				else if(distanceSquared([scan[j][0], scan[j][1]], [scan[j-jIncrement][0], scan[j-jIncrement][1]]) > distanceDisplayThresholdSquared) {
 					context.stroke();
 					context.moveTo(scan[j][0], scan[j][1]);
 					context.beginPath();
