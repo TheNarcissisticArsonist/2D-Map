@@ -6,3 +6,4 @@ https://en.wikipedia.org/wiki/Centroid#Of_a_finite_set_of_points
 https://en.wikipedia.org/wiki/Singular_value_decomposition
 https://www.ling.ohio-state.edu/~kbaker/pubs/Singular_Value_Decomposition_Tutorial.pdf
 http://www.numericjs.com/documentation.html
+https://github.com/odestcj/sgd-slam
