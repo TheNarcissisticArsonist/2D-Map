@@ -52,7 +52,9 @@ var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
 var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
 var overallRotateDrag = 0; //Ditto the above.
 var poses = []; //A list of poses to be used with loop closure.
+var constraints = []; //A list of constraints between poses.
 var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
+var loopClosureIterationPower = 1; //The power the iteration is raised to when computed in the stochastic gradient descent.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
@@ -145,9 +147,11 @@ function normalMainLoop(formatted) {
 	var scanThetaMax = scanDataFormatted[1];
 	var scanRangeList = scanDataFormatted[2];
 	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
+	
+	var currentPose = [robotPosition[0], robotPosition[1], robotOrientationTheta];
 
-	var currentPose = new pose(robotPosition, robotOrientationTheta, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList);
-	poses.push(currentPose);
+	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList);
+	poses.push(currentPoseData);
 
 	storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 	processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
@@ -703,13 +707,123 @@ function zoomed(e) {
 	var zoomMultiplier = Math.pow(2, e.wheelDelta/zoomScrollConstant); //Raising 2 to the power of wheelDelta changes it from a positive/negative number to a number that is greater than or less than 1, and so it's fit for a scale factor.
 	scaleFactor *= zoomMultiplier;
 }
-function pose(position, poseTheta, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
-	this.position = position;
-	this.poseTheta = poseTheta;
+function runLoopClosure() {
+	var iteration = 0;
+	var finished = false;
+	var M = [];
+	
+	while(!finished) {
+		++iteration;
+		if(iteration > loopClosureMaxIterations) {
+			finished = true;
+		}
+		else {
+			var gamma = [Infinity, Infinity, Infinity];
+
+			for(var i=0; i<poses.length; ++i) {
+				for(var j=0; j<3; ++j) {
+					M[i][j] = 0;
+				}
+			}
+
+			for(var i=0; i<constraints.length; ++i) {
+				var theta = poses[constraints[i].a].pose[2];
+				var R = [
+					[Math.cos(theta), -Math.sin(theta), 0],
+					[Math.sin(theta), Math.cos(theta), 0],
+					[0, 0, 1]
+				];
+				var W = numeric.inv(numeric.dot(numeric.dot(R, constraints[i].sigma), numeric.transpose(R)));
+
+				for(var j=constraints[i].a + 1; j<=constraints[i].b; ++j) {
+					M[j][0] += W[0][0];
+					M[j][1] += W[1][1];
+					M[j][2] += W[2][2];
+
+					if((Math.pow(gamma[0], 2) + Math.pow(gamma[1], 2) + Math.pow(gamma[2], 2)) > (Math.pow(W[0][0], 2) + Math.pow(W[1][1], 2) + Math.pow(W[2][2], 2))) {
+						gamma[0] = W[0][0];
+						gamma[1] = W[1][1];
+						gamma[2] = W[2][2];
+					}
+				}
+			}
+			for(var i=0; i<constraints.length; ++i) {
+				var theta = estimates[constraints[i].a].pose[2]
+				
+				var Pa = [
+					[Math.cos(theta), -Math.sin(theta), estimates[constraints[i].a].pose[0]],
+					[Math.sin(theta), Math.cos(theta), estimates[constraints[i].a].pose[1]],
+					[0, 0, 1]
+				];
+
+				var R = [
+					[Pa[0][0], Pa[0][1], 0],
+					[Pa[1][0], Pa[1][1]], 0],
+					[0, 0, 1]
+				];
+
+				var Tab = [
+					[Math.cos(constraints[i].t[2]), -Math.sin(constraints[i].t[2]), constraints[i].t[0]],
+					[Math.sin(constraints[i].t[2]), Math.cos(constraints[i].t[2]), constraints[i].t[1]],
+					[0, 0, 1]
+				];
+
+				var PbPrime = numeric.dot(Pa, Tab);
+
+				var angleInformationVector = numeric.dot(PbPrime, [1, 0, 0]);
+				var angle = Math.atan2(angleInformationVector[1], angleInformationVector[0]);
+
+				var translationInformationVector = numeric.dot(PbPrime, [0, 0, 1]);
+
+				var r = [
+					translationInformationVector[0] - poses[constraints[i].b].pose[0],
+					translationInformationVector[1] - poses[constraints[i].b].pose[1],
+					angle - poses[constraints[i].b].pose[2]
+				];
+
+				while(r[2] > 2 * Math.PI) { r[2] -= 2 * Math.PI; }
+				while(r[2] < 0) { r[2] += 2 * Math.PI; }
+
+				var d = numeric.dot(2, numeric.dot(numeric.inv(numeric.dot(numeric.dot(numeric.transpose(R), constraints[i].sigma), R)), r));
+
+				for(var j=0; j<3; ++j) {
+					var alpha = 1/(gamma * Math.pow(iteration, loopClosureIterationPower));
+
+					var totalWeight = 0;
+					for(var k=constraints[i].a+1; k<=constraints[i].b; ++k) {
+						totalWeight += 1/M[k][j];
+					}
+
+					var beta = (constraints[i].b - constraints[i].a) * d[j] * alpha;
+					if(Math.abs(beta) > Math.abs(r[j])) {
+						beta = r[j];
+					}
+
+					var dPose = 0;
+					for(var k=constraints[i].a+1; k<poses.length; ++k) {
+						if(k >= constraints[i].a+1 && k <= constraints[i].b) {
+							dPose += beta/M[k][j]/totalWeight;
+						}
+						poses[k].pose[j] += dPose;
+					}
+				}
+			}
+		}
+	}
+}
+
+function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
+	this.pose = pose;
 	this.scanMinTheta = scanMinTheta;
 	this.scanMaxTheta = scanMaxTheta;
 	this.scanThetaIncrement = scanThetaIncrement;
 	this.scanRangeList = scanRangeList;
+}
+function constraint(a, b, t, sigma) {
+	this.a = a;
+	this.b = b;
+	this.t = t;
+	this.sigma = sigma;
 }
 
 //This actually sets it up so if you click "setup", the program starts.
