@@ -52,6 +52,7 @@ var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
 var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
 var overallRotateDrag = 0; //Ditto the above.
 var poses = []; //A list of poses to be used with loop closure.
+var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
@@ -418,11 +419,10 @@ function runICP(scan) {
 	var scanAngleError = 0;
 	var scanPositionError = [0, 0];
 	var scanTransformError = [[1, 0], [0, 1]];
-
-	for(var i=0; i<scan.length; ++i) {
-		currentScan.push(scan[i]);
-	}
 	var i = optimizedScanRecord.length - 1;
+
+	currentScan = scan.slice(0);
+
 	while(i >= 0 && knownPoints.length <= minICPComparePoints) {
 		knownPoints = knownPoints.concat(optimizedScanRecord[i]);
 		--i;
@@ -592,8 +592,10 @@ function matchPoints(set1, set2) {
 function removeDuplicates(scan) {
 	var allPoints = [];
 	var remove = false;
-	for(var i=0; i<optimizedScanRecord.length; ++i) {
-		allPoints = allPoints.concat(optimizedScanRecord[i]);
+	for(var i=optimizedScanRecord.length - scansToSearchBackForDuplicates; i<optimizedScanRecord.length; ++i) {
+		if(i >= 0) {
+			allPoints = allPoints.concat(optimizedScanRecord[i]);
+		}
 	}
 	for(var i=scan.length - 1; i>=0; --i) {
 		remove = false;
