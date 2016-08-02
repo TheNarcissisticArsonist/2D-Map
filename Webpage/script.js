@@ -55,6 +55,7 @@ var poses = []; //A list of poses to be used with loop closure.
 var constraints = []; //A list of constraints between poses.
 var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
 var loopClosureIterationPower = 1; //The power the iteration is raised to when computed in the stochastic gradient descent.
+var loopClosureMaxIterations = 500; //The maximum number of iterations that loop closure will run.
 
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
 
