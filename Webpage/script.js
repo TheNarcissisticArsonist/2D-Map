@@ -126,6 +126,9 @@ function notCurrentlyScanning(data) {
 	setCanvasTransforms(robotPosition, robotOrientationTheta);
 	drawRobotPath();
 	drawRobotMap();
+
+	ws.send("Please do not reply."); //The server will see this and do nothing. This just keeps the websocket from timing out.
+
 	requestAnimationFrame(function() { mainLoop(""); });
 }
 function normalMainLoop(formatted) {

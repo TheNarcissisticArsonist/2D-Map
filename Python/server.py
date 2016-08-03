@@ -25,10 +25,10 @@ class WebSocketServer(wspy.Connection):
 	# Run upon receiving a message
 	def onmessage(self, message):
 		print 'Received message "%s"' % message.payload
-		global lastOdomMessage
-		global lastLaserMessage
-		stringToSend = lastOdomMessage + "\n\n" + lastLaserMessage
 		if message.payload == "ready": # If the webpage is ready, give it data
+			global lastOdomMessage
+			global lastLaserMessage
+			stringToSend = lastOdomMessage + "\n\n" + lastLaserMessage
 			self.send(wspy.TextMessage(unicode(stringToSend, "utf-8")))
 			if lastOdomMessage != "OLD" and lastLaserMessage != "old":
 				lastOdomMessage = "OLD"
