@@ -1,24 +1,23 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>2D Map</title>
-    </head>
-    <body style="margin: 0px">
-    	<canvas id="mainCanvas" style="border: 1px solid black" width="800px" height="800px"></canvas>
-        <svg height="200px" width="200px" style="vertical-align: top; padding: 100px 100px;">
-            <circle cx="100" cy="100" r="115" stroke-width="0" fill="blue" id="outerCircle" />
-            <circle cx="100" cy="100" r="75" stroke-width="0" fill="white" />
-        </svg>
-        <div id="start" style="float: right; display: inline-block; background-color: red; padding: 25px;">Start</div>
-    	<br><br>
-    	<textarea id="youSetZoom" rows="1" cols="25" style="display: inline-block;"></textarea>
-    	<div id="enterZoom" style="display: inline-block; background-color: red; display: inline-block;">Enter Your Zoom Factor</div>
-    	<br><br>
-        <div id="saveScan" style="background-color: red; display: inline-block;">Save First Scan</div>
-        <br><br>
-        <div id="toggleScanning" style="background-color: red; display: inline-block;">Toggle Scanning</div>
-    	<div id="dataPrintout"></div>
-        <script type="text/javascript" src="numeric-1.2.6.js"></script>
-        <script type="text/javascript" src="script.js"></script>
-    </body>
+	<head>
+		<title>2D Map</title>
+	</head>
+	<body style="margin: 0px">
+		<canvas id="mainCanvas" style="border: 1px solid black" width="800px" height="800px"></canvas>
+		<svg height="200px" width="200px" style="vertical-align: top; padding: 100px 100px;">
+			<circle cx="100" cy="100" r="115" stroke-width="0" fill="blue" id="outerCircle" />
+			<circle cx="100" cy="100" r="75" stroke-width="0" fill="white" />
+		</svg>
+		<div id="start" style="float: right; display: inline-block; background-color: red; padding: 25px;">Start</div>
+		<br><br>
+		<textarea id="youSetZoom" rows="1" cols="25" style="display: inline-block; vertical-align: middle;"></textarea>
+		<div id="enterZoom" style="display: inline-block; background-color: red; display: inline-block; padding: 5px;">Enter Your Zoom Factor</div>
+		<br><br>
+		<div id="saveScan" style="background-color: red; display: inline-block; padding: 5px;">Save First Scan</div>
+		<div id="toggleScanning" style="background-color: red; display: inline-block; padding: 5px;">Toggle Scanning</div>
+		<div id="dataPrintout"></div>
+		<script type="text/javascript" src="numeric-1.2.6.js"></script>
+		<script type="text/javascript" src="script.js"></script>
+	</body>
 </html>
