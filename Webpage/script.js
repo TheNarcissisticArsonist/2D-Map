@@ -264,14 +264,16 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 	if(optimizedScanRecord.length > 0) {
 		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
 		//if(numFailedScans < maxNumFailedScans) {
-			cleanGlobalXYList = runICP(cleanGlobalXYList);
+		cleanGlobalXYList = runICP(cleanGlobalXYList);
+		reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
 		//}
 		//else {
 		//	manualFit(cleanGlobalXYList);
 		//}
 	}
-
-	reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
+	else {
+		reducedGlobalXYList = cleanGlobalXYList.slice(0);
+	}
 
 	if(reducedGlobalXYList.length > 0) {
 		optimizedScanRecord.push(cleanGlobalXYList);
@@ -595,24 +597,36 @@ function matchPoints(set1, set2) {
 	return indexPairs;
 }
 function removeDuplicates(scan) {
-	var allPoints = [];
-	var remove = false;
-	for(var i=optimizedScanRecord.length - scansToSearchBackForDuplicates; i<optimizedScanRecord.length; ++i) {
+	var allScans = [];
+	var lowIndex = optimizedScanRecord.length - scansToSearchBackForDuplicates;
+	var highIndex = optimizedScanRecord.length - 1; //Inclusive
+	for(var i=lowIndex; i<=highIndex; ++i) {
 		if(i >= 0) {
-			allPoints = allPoints.concat(optimizedScanRecord[i]);
+			allScans.push(optimizedScanRecord[i]);
+		}
+		else {
+			++lowIndex;
 		}
 	}
+	var remove = false;
 	for(var i=scan.length - 1; i>=0; --i) {
 		remove = false;
-		for(var j=0; j<allPoints.length; ++j) {
-			var d = distanceSquared(scan[i], allPoints[j]);
-			if(d < scanDensityDistanceSquared) {
-				remove = true;
+		var j, k;
+		for(j=allScans.length - 1; j>=0; --j) {
+			for(k=allScans[j].length - 1; k>=0; --k) {
+				var d = distanceSquared(scan[i], allScans[j][k]);
+				if(d < scanDensityDistanceSquared) {
+					optimizedScanRecord[j + lowIndex].splice(k, 1);
+					if(optimizedScanRecord[j].length == 0) {
+						optimizedScanRecord.splice(j + lowIndex, 1);
+					}
+					remove = true;
+					break;
+				}
+			}
+			if(remove) {
 				break;
 			}
-		}
-		if(remove) {
-			scan.splice(i, 1);
 		}
 	}
 	return scan;
@@ -759,7 +773,7 @@ function runLoopClosure() {
 
 				var R = [
 					[Pa[0][0], Pa[0][1], 0],
-					[Pa[1][0], Pa[1][1]], 0],
+					[Pa[1][0], Pa[1][1], 0],
 					[0, 0, 1]
 				];
 
