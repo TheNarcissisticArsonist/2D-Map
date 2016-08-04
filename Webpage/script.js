@@ -269,14 +269,14 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
 		//if(numFailedScans < maxNumFailedScans) {
 		cleanGlobalXYList = runICP(cleanGlobalXYList);
-		reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
+		var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
 		//}
 		//else {
 		//	manualFit(cleanGlobalXYList);
 		//}
 	}
 	else {
-		reducedGlobalXYList = cleanGlobalXYList.slice(0);
+		var reducedGlobalXYList = cleanGlobalXYList.slice(0);
 	}
 
 	if(reducedGlobalXYList.length > 0) {
@@ -826,19 +826,49 @@ function runLoopClosure() {
 		}
 	}
 
+	updateSLAM();
 	deleteOldMap();
-	recalculateMapFromPoses();
-	loadNewMap();
-	resumeScanning();
+	recalculateMapFromPoses(0);
+}
+function updateSLAM() {
+
 }
 function deleteOldMap() {
-
+	positionRecord = [];
+	optimizedScanRecord = [];
 }
-function recalculateMapFromPoses() {
+function recalculateMapFromPoses(iteration) {
+	var i = iteration;
+	var position = [];
+	position[0] = poses[i].pose[0];
+	position[0] = poses[i].pose[1];
+	var robotTheta = poses[i].pose[2];
+	var thetaMin = poses[i].scanMinTheta;
+	var thetaMax = poses[i].scanMaxTheta;
+	var rangeList = poses[i].scanRangeList.slice(0);
+	var thetaIncrement = (thetaMax - thetaMin) / rangeList.length;
+	
+	storePosition(position);
 
-}
-function loadNewMap() {
+	var robotXYList = convertScanToRobotXY(thetaMin, thetaMax, , rangeList, thetaIncrement);
+	var globalXYList = convertRobotXYToGlobalXY(robotXYList, position, robotTheta);
+	var cleanGlobalXYList = removeScanNaN(globalXYList);
+	var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
 
+	if(reducedGlobalXYList.length > 0) {
+		optimizedScanRecord.push(cleanGlobalXYList);
+	}
+
+	++i;
+
+	if(i < poses.length) {
+		window.setTimeout(function() {
+			recalculateMapFromPoses(i);
+		}, 0);
+	}
+	else {
+		resumeScanning();
+	}
 }
 function resumeScanning() {
 
