@@ -871,7 +871,8 @@ function recalculateMapFromPoses(iteration) {
 	}
 }
 function resumeScanning() {
-
+	currentlyScanning = true;
+	sendDataRequest();
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
