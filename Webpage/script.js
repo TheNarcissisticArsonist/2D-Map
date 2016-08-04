@@ -1,3 +1,4 @@
+//Constants
 var webSocketIP = "127.0.0.1"; //The IP of the websocket server.
 var webSocketPort = "12345"; //The port the websocket is being served on.
 var webSocketPath = "/"; //The file path of the websocket.
@@ -10,16 +11,9 @@ var robotMarkerArrowAngle = Math.PI/6; //There's an arrow on the circle, showing
 var scaleFactorMultiplier = 50; //This lets it default to 1 pixel = 2 cm.
 var distanceDisplayThreshold = 0.1; //If the distance between two points in a scan is greater than 0.1, it won't draw a line between them.
 var distanceDisplayThresholdSquared = Math.pow(distanceDisplayThreshold, 2); //It's squared so it can be used with distanceSquared.
-var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
-var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
-var optimizedScanRecord = []; //This is the list of laser scans. The indeces correspond with positionRecord[]. They're in x-y position format, the same as positionRecord.
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
 var scanRangeListIndex = 44; //Same, but for the list of ranges.
-var saveThisScan = false; //If true, the next scan will be saved.
-var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
-var positionOffset = [0, 0]; //Ditto the above, but for position.
-var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
 var icpAverageDistanceTraveledThresholdSquared = Math.pow(icpAverageDistanceTraveledThreshold, 2); //This is squared for use with the distanceSquared function.
@@ -31,39 +25,45 @@ var minICPComparePoints = 3000; //The minimum number of points ICP must use to c
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
 var goodCorrespondenceThreshold = 0; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 var goodCorrespondenceThresholdSquared = Math.pow(goodCorrespondenceThreshold, 2); //If this is to be implemented, distanceSquared will be faster.
+var maxNumFailedScans = 10; //How many scans have to fail in a row to go to user-manual fit.
+var numRecentScans = 100; //How many scans to show when recentScansOnly is true.
+var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
+var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
+var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
+var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
+var loopClosureIterationPower = 1; //The power the iteration is raised to when computed in the stochastic gradient descent.
+var loopClosureMaxIterations = 500; //The maximum number of iterations that loop closure will run.
+
+//Global variables
+var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
+var optimizedScanRecord = []; //This is the list of laser scans. The indeces correspond with positionRecord[]. They're in x-y position format, the same as positionRecord.
+var scaleFactor = scaleFactorMultiplier; //As the path and information get bigger, it's useful to zoom out.
 var currentlyScanning = true; //Used to know when to stop asking for more scans.
 var lastAngle = 0; //Saved each iteration in case the user turns off scans. Updated in mainLoop.
 var lastPosition = [0, 0]; //Saved each iteration, for the same reason as above. Updated in drawRobotPath.
 var numFailedScans = 0; //How many scans have failed in a row.
-var maxNumFailedScans = 10; //How many scans have to fail in a row to go to user-manual fit.
 var currentMouseCoords = [0, 0]; //The current coordinates of the mouse.
 var canvasClickedCoords = [0, 0]; //The coordinates where the canvas was clicked.
 var wasTheCanvasClicked = false; //Pretty self explanatory.
 var overallCanvasDrag = [0, 0]; //This is applied to context transforms, so you can drag the map.
 var lastOverallCanvasDrag = [0, 0]; //This is used so that when you drag the map, it's then applied to the next time you drag it.
 var recentScansOnly = true; //When this is true, only recent scans will be shown, to speed up the program.
-var numRecentScans = 100; //How many scans to show when recentScansOnly is true.
-var mapIncrementScanning = 5; //The value for mapIncrement used while scanning.
-var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
 var mapIncrement = mapIncrementScanning; //What fraction of scans to display on the map.
-var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming in or out. This is really specific to which mouse you use, and your preferences.
-var wasTheRotateClicked = false; //This is self explanatory!
+var wasTheRotateClicked = false; //Whether the map rotate wheel was clicked or not.
 var rotateClickedAngle = 0; //The angle where the rotation thing was clicked.
 var lastOverallRotateDrag = 0; //This makes it so you can rotate the map.
 var overallRotateDrag = 0; //Ditto the above.
 var poses = []; //A list of poses to be used with loop closure.
 var constraints = []; //A list of constraints between poses.
-var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
-var loopClosureIterationPower = 1; //The power the iteration is raised to when computed in the stochastic gradient descent.
-var loopClosureMaxIterations = 500; //The maximum number of iterations that loop closure will run.
+var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
+var positionOffset = [0, 0]; //Ditto the above, but for position.
+var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 
-var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle; //These are global variables used for UI stuff.
+//HTML Elements
+var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle;
 
 function setup() {
 	console.log("Running setup function.");
-
-	document.getElementById("saveScan").addEventListener("click", saveScan);
-	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
 
 	canvas = document.getElementById("mainCanvas"); //Grab the HTML canvas element.
 	canvas.style.transform = "matrix(0, -1, 1, 0, 0, 0)"; //Rotate the canvas so up is forward, like in a map.
@@ -77,6 +77,7 @@ function setup() {
 	outerCircle.addEventListener("mousedown", rotateClicked);
 	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
 	document.body.addEventListener("mouseup", clickReleased);
+	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -338,10 +339,6 @@ function clearCanvas() {
 	context.setTransform(1, 0, 0, 1, 0, 0); //Reset all transforms on the context.
 	context.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas.
 	context.beginPath();
-}
-function saveScan() {
-	saveThisScan = true;
-	//This comment is just here so the function will collapse in sublime.
 }
 function setConstantCanvasTransforms() {
 	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center.
@@ -844,7 +841,7 @@ function loadNewMap() {
 
 }
 function resumeScanning() {
-	
+
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
