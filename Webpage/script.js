@@ -828,6 +828,23 @@ function runLoopClosure() {
 			}
 		}
 	}
+
+	deleteOldMap();
+	recalculateMapFromPoses();
+	loadNewMap();
+	resumeScanning();
+}
+function deleteOldMap() {
+
+}
+function recalculateMapFromPoses() {
+
+}
+function loadNewMap() {
+
+}
+function resumeScanning() {
+	
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
