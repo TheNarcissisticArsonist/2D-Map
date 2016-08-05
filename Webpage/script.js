@@ -727,6 +727,7 @@ function runLoopClosure() {
 	var iteration = 0;
 	var finished = false;
 	var M = [];
+	var oldLastPose = poses[poses.length - 1];
 	
 	while(!finished) {
 		++iteration;
@@ -828,12 +829,22 @@ function runLoopClosure() {
 		}
 	}
 
-	updateSLAM();
+	updateSLAM(oldLastPose);
 	deleteOldMap();
 	recalculateMapFromPoses(0);
 }
-function updateSLAM() {
+function updateSLAM(oldPose) {
+	var newPose = poses[poses.length - 1];
 
+	var thetaDifference = newPose.pose[2] - oldPose.pose[2];
+	var positionDifference = [0, 0];
+	positionDifference[0] = newPose.pose[0] - oldPose.pose[0];
+	positionDifference[1] = newPose.pose[1] - oldPose.pose[1];
+	var rotationMatrix = [[Math.cos(thetaDifference), -Math.sin(thetaDifference)], [Math.sin(thetaDifference), Math.cos(thetaDifference)]];
+
+	angleOffset += angleOffset;
+	rotationTransformOffset = numeric.dot(rotationTransformOffset, rotationMatrix);
+	positionOffset = numeric.add(positionDifference, positionOffset);
 }
 function deleteOldMap() {
 	positionRecord = [];
