@@ -78,6 +78,7 @@ function setup() {
 	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
 	document.body.addEventListener("mouseup", clickReleased);
 	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
+	document.getElementById("loopClosure").addEventListener("click", loopClosureButtonClicked);
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -736,6 +737,7 @@ function runLoopClosure() {
 			var gamma = [Infinity, Infinity, Infinity];
 
 			for(var i=0; i<poses.length; ++i) {
+				M.push([]);
 				for(var j=0; j<3; ++j) {
 					M[i][j] = 0;
 				}
@@ -841,7 +843,7 @@ function recalculateMapFromPoses(iteration) {
 	var i = iteration;
 	var position = [];
 	position[0] = poses[i].pose[0];
-	position[0] = poses[i].pose[1];
+	position[1] = poses[i].pose[1];
 	var robotTheta = poses[i].pose[2];
 	var thetaMin = poses[i].scanMinTheta;
 	var thetaMax = poses[i].scanMaxTheta;
@@ -850,7 +852,7 @@ function recalculateMapFromPoses(iteration) {
 	
 	storePosition(position);
 
-	var robotXYList = convertScanToRobotXY(thetaMin, thetaMax, , rangeList, thetaIncrement);
+	var robotXYList = convertScanToRobotXY(thetaMin, thetaMax, rangeList, thetaIncrement);
 	var globalXYList = convertRobotXYToGlobalXY(robotXYList, position, robotTheta);
 	var cleanGlobalXYList = removeScanNaN(globalXYList);
 	var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
@@ -862,17 +864,15 @@ function recalculateMapFromPoses(iteration) {
 	++i;
 
 	if(i < poses.length) {
-		window.setTimeout(function() {
+		//window.setTimeout(function() {
 			recalculateMapFromPoses(i);
-		}, 0);
-	}
-	else {
-		resumeScanning();
+		//}, 0);
 	}
 }
-function resumeScanning() {
-	currentlyScanning = true;
-	sendDataRequest();
+function loopClosureButtonClicked() {
+	if(!currentlyScanning) {
+		runLoopClosure();
+	}
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
