@@ -71,6 +71,7 @@ function setup() {
 	context.fillStyle = "white"; //Set the fill style of closed shapes on the canvas to white.
 	context.beginPath(); //This starts a path with which lines can be drawn.
 
+	//Creating various event listeners for UI elements, such as clicking and dragging the canvas and such.
 	canvas.addEventListener("mousedown", canvasClicked);
 	canvas.addEventListener("mousewheel", function(event) {zoomed(event);});
 	outerCircle = document.getElementById("outerCircle");
@@ -82,7 +83,8 @@ function setup() {
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
-	ws = new WebSocket("ws://"+webSocketIP+":"+webSocketPort+webSocketPath); //This creates the websocket object.
+	var webSocketAddress = "ws://"+webSocketIP+":"+webSocketPort+webSocketPath;
+	ws = new WebSocket(webSocketAddress); //This creates the websocket object.
 	ws.onmessage = function(event) { //When a message is received...
 		//console.log(event.data);
 		mainLoop(event.data); //Go into the main loop and use the data.
@@ -830,8 +832,10 @@ function runLoopClosure() {
 	}
 
 	updateSLAM(oldLastPose);
+	console.log(optimizedScanRecord);
 	deleteOldMap();
 	recalculateMapFromPoses(0);
+	console.log(optimizedScanRecord);
 }
 function updateSLAM(oldPose) {
 	var newPose = poses[poses.length - 1];
@@ -882,6 +886,7 @@ function recalculateMapFromPoses(iteration) {
 }
 function loopClosureButtonClicked() {
 	if(!currentlyScanning) {
+		console.log("Running loop closure!");
 		runLoopClosure();
 	}
 }
