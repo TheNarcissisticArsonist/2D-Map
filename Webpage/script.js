@@ -809,7 +809,7 @@ function runLoopClosure() {
 				var d = numeric.dot(2, numeric.dot(numeric.inv(numeric.dot(numeric.dot(numeric.transpose(R), constraints[i].sigma), R)), r));
 
 				for(var j=0; j<3; ++j) {
-					var alpha = 1/(gamma * Math.pow(iteration, loopClosureIterationPower));
+					var alpha = 1/(gamma[j] * Math.pow(iteration, loopClosureIterationPower));
 
 					var totalWeight = 0;
 					for(var k=constraints[i].a+1; k<=constraints[i].b; ++k) {
