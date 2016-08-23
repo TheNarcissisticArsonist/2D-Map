@@ -7,3 +7,5 @@ https://en.wikipedia.org/wiki/Singular_value_decomposition
 https://www.ling.ohio-state.edu/~kbaker/pubs/Singular_Value_Decomposition_Tutorial.pdf
 http://www.numericjs.com/documentation.html
 https://github.com/odestcj/sgd-slam
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify
+http://www.w3schools.com/json/json_files.asp
