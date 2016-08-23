@@ -770,11 +770,11 @@ function runLoopClosure() {
 				}
 			}
 			for(var i=0; i<constraints.length; ++i) {
-				var theta = estimates[constraints[i].a].pose[2]
+				var theta = poses[constraints[i].a].pose[2]
 				
 				var Pa = [
-					[Math.cos(theta), -Math.sin(theta), estimates[constraints[i].a].pose[0]],
-					[Math.sin(theta), Math.cos(theta), estimates[constraints[i].a].pose[1]],
+					[Math.cos(theta), -Math.sin(theta), poses[constraints[i].a].pose[0]],
+					[Math.sin(theta), Math.cos(theta), poses[constraints[i].a].pose[1]],
 					[0, 0, 1]
 				];
 
