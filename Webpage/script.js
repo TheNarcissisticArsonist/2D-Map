@@ -33,6 +33,8 @@ var zoomScrollConstant = 120*4; //How much a scroll is divided by when zooming i
 var scansToSearchBackForDuplicates = 25; //How many scans are looked at when testing if duplicate points should be removed.
 var loopClosureIterationPower = 1; //The power the iteration is raised to when computed in the stochastic gradient descent.
 var loopClosureMaxIterations = 500; //The maximum number of iterations that loop closure will run.
+var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map data for the purposes of saving data.
+var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -889,6 +891,15 @@ function loopClosureButtonClicked() {
 		console.log("Running loop closure!");
 		runLoopClosure();
 	}
+}
+function saveMap() {
+	var mapData = {};
+	mapData.poseList = poses.slice(0);
+
+	var mapDataString = JSON.stringify(mapData, null, 4);
+
+	var jsonDataWindow = window.open("", "", "width=" + mapDataDisplayPageWidth + ", height=" + mapDataDisplayPageHeight + "");
+	requestAnimationFrame(function() { jsonDataWindow.document.body.innerHTML = "<pre>" + mapDataString + "</pre>"; });
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {

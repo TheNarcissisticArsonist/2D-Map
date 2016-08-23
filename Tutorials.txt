@@ -9,3 +9,4 @@ http://www.numericjs.com/documentation.html
 https://github.com/odestcj/sgd-slam
 https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify
 http://www.w3schools.com/json/json_files.asp
+http://www.w3schools.com/jsref/met_win_open.asp
