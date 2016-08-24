@@ -65,6 +65,7 @@ var highlightedPoses = []; //A list of poses to highlight on the map, to make sc
 
 //HTML Elements
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton;
+var unHighlightedScanTextArea, unHighlightedScanButton;
 
 function setup() {
 	console.log("Running setup function.");
@@ -88,6 +89,9 @@ function setup() {
 	highlightedScanTextArea = document.getElementById("youHighlightScans");
 	highlightedScanButton = document.getElementById("enterHighlightScans");
 	highlightedScanButton.addEventListener("click", userScanHighlighted);
+	unHighlightedScanTextArea = document.getElementById("youUnHighlightScans");
+	unHighlightedScanButton = document.getElementById("enterUnHighlightScans");
+	unHighlightedScanButton.addEventListener("click", userScanUnHighlighted);
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -923,6 +927,15 @@ function userScanHighlighted() {
 	if(!isNaN(rawIndex)) { //Make sure it's a number.
 		if(rawIndex >= 0 && rawIndex < poses.length) { //Make sure it's a proper index.
 			highlightedPoses.push(rawIndex);
+		}
+	}
+}
+function userScanUnHighlighted() {
+	rawIndex = Number(unHighlightedScanTextArea.value);
+	if(!isNaN(rawIndex)) { //Make sure it's a number.
+		if(rawIndex >= 0 && rawIndex < poses.length) { //Make sure it's a proper index.
+			var metaIndex = highlightedPoses.indexOf(rawIndex);
+			highlightedPoses.splice(metaIndex, 1);
 		}
 	}
 }
