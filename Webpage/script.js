@@ -35,6 +35,7 @@ var loopClosureIterationPower = 1; //The power the iteration is raised to when c
 var loopClosureMaxIterations = 500; //The maximum number of iterations that loop closure will run.
 var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map data for the purposes of saving data.
 var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
+var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -60,9 +61,10 @@ var constraints = []; //A list of constraints between poses.
 var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
+var highlightedPoses = []; //A list of poses to highlight on the map, to make scan matching easier.
 
 //HTML Elements
-var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle;
+var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton;
 
 function setup() {
 	console.log("Running setup function.");
@@ -82,6 +84,10 @@ function setup() {
 	document.body.addEventListener("mouseup", clickReleased);
 	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
 	document.getElementById("loopClosure").addEventListener("click", loopClosureButtonClicked);
+	
+	highlightedScanTextArea = document.getElementById("youHighlightScans");
+	highlightedScanButton = document.getElementById("enterHighlightScans");
+	highlightedScanButton.addEventListener("click", userScanHighlighted);
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -132,6 +138,7 @@ function notCurrentlyScanning(data) {
 	setCanvasTransforms(robotPosition, robotOrientationTheta);
 	drawRobotPath();
 	drawRobotMap();
+	drawHighlightedPoses();
 
 	ws.send("Please do not reply."); //The server will see this and do nothing. This just keeps the websocket from timing out.
 
@@ -708,7 +715,6 @@ function rotateDragged() {
 	var newTheta = Math.PI + Math.atan2(currentMouseCoords[1] - circleCenterCoords[1], currentMouseCoords[0] - circleCenterCoords[0]);
 	var thetaOffset = newTheta - rotateClickedAngle;
 	overallRotateDrag = thetaOffset + lastOverallRotateDrag;
-	console.log(newTheta);
 }
 function clickReleased() {
 	if(wasTheCanvasClicked) {
@@ -900,6 +906,25 @@ function saveMap() {
 
 	var jsonDataWindow = window.open("", "", "width=" + mapDataDisplayPageWidth + ", height=" + mapDataDisplayPageHeight + "");
 	requestAnimationFrame(function() { jsonDataWindow.document.body.innerHTML = "<pre>" + mapDataString + "</pre>"; });
+}
+function drawHighlightedPoses() {
+	context.strokeStyle = "#0000ff";
+	for(var i=0; i<highlightedPoses.length; ++i) {
+		var pose = poses[highlightedPoses[i]];
+		context.beginPath();
+		context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
+		context.lineTo(pose.pose[0], pose.pose[1]);
+		context.stroke();
+	}
+	context.strokeStyle = "#000000";
+}
+function userScanHighlighted() {
+	rawIndex = Number(highlightedScanTextArea.value);
+	if(!isNaN(rawIndex)) { //Make sure it's a number.
+		if(rawIndex >= 0 && rawIndex < poses.length) { //Make sure it's a proper index.
+			highlightedPoses.push(rawIndex);
+		}
+	}
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
