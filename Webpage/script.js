@@ -36,6 +36,7 @@ var loopClosureMaxIterations = 500; //The maximum number of iterations that loop
 var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map data for the purposes of saving data.
 var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
+var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -893,7 +894,7 @@ function recalculateMapFromPoses(iteration) {
 	if(i < poses.length) {
 		window.setTimeout(function() {
 			recalculateMapFromPoses(i);
-		}, 0);
+		}, poseRecalculationDelay);
 	}
 }
 function loopClosureButtonClicked() {
