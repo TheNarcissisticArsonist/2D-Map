@@ -173,10 +173,12 @@ function normalMainLoop(formatted) {
 	var currentPose = [robotPosition[0], robotPosition[1], robotOrientationTheta];
 
 	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList);
-	poses.push(currentPoseData);
 
-	storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
-	processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
+	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
+	if(goodScan) {
+		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
+		poses.push(currentPoseData);
+	}
 
 	context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
 
@@ -298,6 +300,10 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 
 	if(reducedGlobalXYList.length > 0) {
 		optimizedScanRecord.push(cleanGlobalXYList);
+		return true; //This means it's a good scan.
+	}
+	else {
+		return false; //Bad scan.
 	}
 }
 function convertScanToRobotXY(min, max, rangeList, increment) {
@@ -406,7 +412,7 @@ function drawRobotMap() {
 		startIndex = (optimizedScanRecord.length - numRecentScans) - (optimizedScanRecord.length % mapIncrement);
 	}
 	for(var i=startIndex; i<optimizedScanRecord.length; i+=mapIncrement) {
-		if(i >= 0) {
+		if(i >= 0 && optimizedScanRecord[i].length > 0) {
 			scan = optimizedScanRecord[i];
 			context.moveTo(scan[0][0], scan[0][1]);
 			context.beginPath();
