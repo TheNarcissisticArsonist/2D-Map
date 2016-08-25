@@ -891,9 +891,9 @@ function recalculateMapFromPoses(iteration) {
 	++i;
 
 	if(i < poses.length) {
-		//window.setTimeout(function() {
+		window.setTimeout(function() {
 			recalculateMapFromPoses(i);
-		//}, 0);
+		}, 0);
 	}
 }
 function loopClosureButtonClicked() {
