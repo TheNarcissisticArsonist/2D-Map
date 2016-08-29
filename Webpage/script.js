@@ -287,7 +287,7 @@ function cleanUpScanData(min, max, rangeList) {
 	rangeList[0] = rangeList[0].slice(8); //Remove the characters at the beginning.
 	rangeList[rangeList.length - 1] = rangeList[rangeList.length - 1].slice(0, -1); //Get rid of that one last character.
 	for(var i=0; i<rangeList.length; ++i) {
-		rangeList[i] = Number(rangeList[i]); //Make them all numbers!
+		rangeList[i] = Number(rangeList[i]); //Convert them from strings to numbers.
 	}
 
 	return [min, max, rangeList];
@@ -384,7 +384,7 @@ function clearCanvas() {
 	context.beginPath(); //This makes sure that context.stroke() will not draw any lines from the previous line path (the one that was erased).
 }
 function setConstantCanvasTransforms() {
-	//This sets several canvas transforms that are universally used.
+	//This sets several canvas transforms that are universally used throughout the program.
 	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center.
 	context.transform(1, 0, 0, -1, 0, 0); //Flip the canvas so y+ is up.
 	context.transform(scaleFactor, 0, 0, scaleFactor, 0, 0); //Scale the canvas.
@@ -412,24 +412,24 @@ function setCanvasTransforms(position, orientation) {
 	context.transform(1, 0, 0, 1, -position[0], -position[1]); //This is the translation to center the robot.
 }
 function drawRobotPath() {
-	context.strokeStyle = "#00aa00";
+	context.strokeStyle = "#00aa00"; //This is a somewhat dark green.
 	context.beginPath();
 	//This will draw a line from each point in the robot's path to the subsequent point.
-	context.moveTo(positionRecord[0][0], positionRecord[0][1]);
+	context.moveTo(positionRecord[0][0], positionRecord[0][1]); //Start out at the first point.
 	for(var i=1; i<positionRecord.length; ++i) {
-		context.lineTo(positionRecord[i][0], positionRecord[i][1]);
+		context.lineTo(positionRecord[i][0], positionRecord[i][1]); //Draw a line to the next point.
 	}
 	var lastIndex = positionRecord.length - 1;
-	lastPosition = [positionRecord[lastIndex][0], positionRecord[lastIndex][1]];
-	context.stroke();
-	context.strokeStyle = "#000000";
-	context.beginPath();
+	lastPosition = [positionRecord[lastIndex][0], positionRecord[lastIndex][1]]; //Update the lastPosition variable (in case the user decides to toggle scanning).
+	context.stroke(); //Draw out the robot's path.
+	context.strokeStyle = "#000000"; //Reset the stroke color to black.
+	context.beginPath(); //Start a new path.
 }
 function drawRobotMap() {
-	context.strokeStyle = "#aa0000";
-	context.beginPath();
+	context.strokeStyle = "#aa0000"; //Make the stroke color dark red.
+	context.beginPath(); //Start a new path.
 	var startIndex = 0;
-	if(recentScansOnly) {
+	if(recentScansOnly) { //recentScansOnly is true when actively scanning.
 		startIndex = (optimizedScanRecord.length - numRecentScans) - (optimizedScanRecord.length % mapIncrement);
 	}
 	for(var i=startIndex; i<optimizedScanRecord.length; i+=mapIncrement) {
