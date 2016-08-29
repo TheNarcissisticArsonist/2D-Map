@@ -1,5 +1,5 @@
 //Constants
-var webSocketIP = "127.0.0.1"; //The IP of the websocket server.
+var webSocketIP = "127.0.0.1"; //The IP of the websocket server. 127.0.0.1 is the localhost IP.
 var webSocketPort = "12345"; //The port the websocket is being served on.
 var webSocketPath = "/"; //The file path of the websocket.
 var formattedDataStringExpectedArrayLength = 46; //The expected length of the formatted data string from formatRawMessage().
@@ -79,46 +79,51 @@ function setup() {
 	context.beginPath(); //This starts a path with which lines can be drawn.
 
 	//Creating various event listeners for UI elements, such as clicking and dragging the canvas and such.
-	canvas.addEventListener("mousedown", canvasClicked);
-	canvas.addEventListener("mousewheel", function(event) {zoomed(event);});
-	outerCircle = document.getElementById("outerCircle");
-	outerCircle.addEventListener("mousedown", rotateClicked);
-	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); });
-	document.body.addEventListener("mouseup", clickReleased);
-	document.getElementById("toggleScanning").addEventListener("click", toggleScanning);
-	document.getElementById("loopClosure").addEventListener("click", loopClosureButtonClicked);
+	canvas.addEventListener("mousedown", canvasClicked); //This event listener is used for clicking and dragging the canvas.
+	canvas.addEventListener("mousewheel", function(event) {zoomed(event);}); //This event listener is used for zooming in and out on the canvas.
+	outerCircle = document.getElementById("outerCircle"); //The "outer circle" is the donut to the right of the map display.
+	outerCircle.addEventListener("mousedown", rotateClicked); //This event listener is used for rotating the canvas by dragging the donut.
+	document.body.addEventListener("mousemove", function(event) { mouseMoved(event); }); //This event listener fires anytime the mouse moves around the body, to record its coordinates.
+	document.body.addEventListener("mouseup", clickReleased); //This event listener is used to test for the user releasing the drag for the canvas or donut.
+															  //It's set to the whole body because sometimes, when you're dragging, you go outside of the element.
+	document.getElementById("toggleScanning").addEventListener("click", toggleScanning); //This event listener is for the toggle scanning button.
+	document.getElementById("loopClosure").addEventListener("click", loopClosureButtonClicked); //This event listener is for the loop closure button.
 	
-	highlightedScanTextArea = document.getElementById("youHighlightScans");
-	highlightedScanButton = document.getElementById("enterHighlightScans");
-	highlightedScanButton.addEventListener("click", userScanHighlighted);
-	unHighlightedScanTextArea = document.getElementById("youUnHighlightScans");
-	unHighlightedScanButton = document.getElementById("enterUnHighlightScans");
-	unHighlightedScanButton.addEventListener("click", userScanUnHighlighted);
+	highlightedScanTextArea = document.getElementById("youHighlightScans"); //This is the text area where you can input specific scans to be highlighted.
+	highlightedScanButton = document.getElementById("enterHighlightScans"); //This is the html element of the button to input a highlighted scan.
+	highlightedScanButton.addEventListener("click", userScanHighlighted); //And this is its corresponding click event listener.
+	unHighlightedScanTextArea = document.getElementById("youUnHighlightScans"); //This is the text area where you can input specific scans to be unhighlighted.
+	unHighlightedScanButton = document.getElementById("enterUnHighlightScans"); //This is the html element of the button to input an unhighlighted scan.
+	unHighlightedScanButton.addEventListener("click", userScanUnHighlighted); //And this is its corresponding event listener.
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
-	var webSocketAddress = "ws://"+webSocketIP+":"+webSocketPort+webSocketPath;
-	ws = new WebSocket(webSocketAddress); //This creates the websocket object.
-	ws.onmessage = function(event) { //When a message is received...
+	var webSocketAddress = "ws://"+webSocketIP+":"+webSocketPort+webSocketPath; //This compiles the URL of the websocket. Mine looks something like "ws://127.0.0.1:12345/".
+	ws = new WebSocket(webSocketAddress); //This creates the actual javascript websocket object.
+	ws.onmessage = function(event) { //This method is fired when a message is received.
 		//console.log(event.data);
-		mainLoop(event.data); //Go into the main loop and use the data.
+		mainLoop(event.data); //When a message is received, the mainLoop function is called with the message payload.
 	}
-	ws.onopen = function() {
+	ws.onopen = function() { //This method is fired once the webpage connects to the websocket server.
 		console.log("Connection opened.");
-		sendDataRequest(); //Send a request for data once the connection is opened.
+		sendDataRequest(); //As soon as the connection is opened, send a request for data.
 	}
 }
 function mainLoop(data) {
-	var formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier to use.
+	var formattedMessage = formatRawMessage(data); //This takes the raw data sent through the websocket, and converts it into something that's a bit easier for the javascript to use.
+												   //The structure of the formatted message is an array, where each index is the data from the corresponding line of the input message.
+												   //For example, index 0 is the first line of the message, index 1 is the second line, etc.
+												   //See the formatRawMessage function for more details.
 
-	if(!currentlyScanning) {
+	//At this point, there are several ways the program can proceed.
+	if(!currentlyScanning) { //If the program isn't taking new scans, and is just displaying the map, notCurrentlyScanning will be called.
 		notCurrentlyScanning(data);
 		return;
 	}
-	else if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //I.e., the data is correct...
+	else if(formattedMessage.length == formattedDataStringExpectedArrayLength) { //If the program is taking new scans, and the data received is valid, normalMainLoop will be called.
 		normalMainLoop(formattedMessage);
 	}
-	else {
+	else { //If the program is taking new scans, but the data received is invalid or old, badDataMainLoop will be called.
 		badDataMainLoop(formattedMessage);
 	}
 
@@ -129,78 +134,86 @@ function mainLoop(data) {
 
 function notCurrentlyScanning(data) {
 	//This section of code can be activated by clicking the button to stop scanning on the webpage.
-	//It allows you to zoom in and out, without taking new scans. Since ICP isn't being run, it renders much more quickly.
-	if(recalculatingMap) {
+	//It allows you to zoom in and out, pan, and rotate, all without taking new scans. Use this when you want to see the current state of the map.
+
+	if(recalculatingMap) { //This will fire if loop closure has been run, and the map is currently being recalculated from the poses. See the runLoopClosure function for more information.
 		console.log("Recalculating map...");
 	}
 	else {
 		console.log("Not currently scanning.");
 	}
 
-	//These are saved, to keep the screen centered on where the robot would be. I may rework this later.
+	//These are saved so that when you toggle scanning, the center of the screen stays at the robot's last position, as opposed to jumping to the arbitrary global origin point.
+	//From there, you can pan, zoom, and rotate to your pleasure.
 	var robotPosition = lastPosition;
 	var robotOrientationTheta = lastAngle;
 
-	context.lineWidth = 1 / scaleFactor;
-	clearCanvas();
-	setConstantCanvasTransforms();
-	context.rotate(overallRotateDrag);
-	context.translate(overallCanvasDrag[1], -overallCanvasDrag[0]);
-	setCanvasTransforms(robotPosition, robotOrientationTheta);
-	drawRobotPath();
-	drawRobotMap();
-	drawHighlightedPoses();
+	//This is a series of canvas operations designed to clear and reset the canvas for the next frame to be drawn.
+	context.lineWidth = 1 / scaleFactor; //This resizes the lines drawn relative to the canvas's scale.
+	clearCanvas(); //This clears the canvas by resetting the transforms and drawing a giant white rectangle over everything.
+	setConstantCanvasTransforms(); //This does some basic transforms that are always applied in the same way. For example, flipping the context so y+ is up instead of down, and moving 0, 0 to the center of the canvas.
+	context.rotate(overallRotateDrag); //This rotates the canvas based on what the user has done.
+	context.translate(overallCanvasDrag[1], -overallCanvasDrag[0]); //This pans the canvas based on what the user has done.
+	setCanvasTransforms(robotPosition, robotOrientationTheta); //This then implements the transforms from the robot's last position, as explained above when robotPosition and robotOrientationTheta are defined.
+
+	//This is a series of functions that actually draw the frame.
+	drawRobotPath(); //This draws the path the robot has taken.
+	drawRobotMap(); //This draws the edges the laser scanner has detected.
+	drawHighlightedPoses(); //This draws little circles to highlight any poses the user has specified.
 
 	ws.send("Please do not reply."); //The server will see this and do nothing. This just keeps the websocket from timing out.
 
-	requestAnimationFrame(function() { mainLoop(""); });
+	requestAnimationFrame(function() { mainLoop("niceme.me"); }); //This calls the main loop function again, with irrelevant data. Since currentlyScanning is false, what's input doesn't matter.
 }
 function normalMainLoop(formatted) {
 	//console.log("Main loop!");
 	//console.log(positionOffset);
 
-	var robotPositionXYZ = getPositionFromFormattedMessage(formatted);
-	var quaternion = getQuaternionFromFormattedMessage(formatted);
-	var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses.
+	var robotPositionXYZ = getPositionFromFormattedMessage(formatted); //This gets the robot's position from the formatted message.
+	var quaternion = getQuaternionFromFormattedMessage(formatted); //This gets the quaternion data (the robot's orientation) from the formatted message.
+	var eulerAngles = quaternionToEuler(quaternion); //The robot sends orientation data in the form of a quaternion, whereas euler angles (the normal kind) are what canvas uses. This converts between the two.
 
-	//This offsets the position and orientation by the stored error.
-	var robotOrientationTheta = eulerAngles[eulerAngleUsed] + angleOffset;
-	var robotPosition = numeric.dot(rotationTransformOffset, robotPositionXYZ.slice(0, 2));
-	robotPosition = numeric.add(robotPosition, positionOffset);
+	//This offsets the position and orientation by the stored error. In other words, this is where the localization part of the SLAM algorithm happens.
+	var robotOrientationTheta = eulerAngles[eulerAngleUsed] + angleOffset; //This adds the angle error to the robot's orientation.
+	var robotPosition = numeric.dot(rotationTransformOffset, robotPositionXYZ.slice(0, 2)); //This multiplies the angle error's transformation matrix into the robot's position.
+	robotPosition = numeric.add(robotPosition, positionOffset); //This adds the position error to the robot's position.
 
 	lastAngle = robotOrientationTheta; //This is used if the user stops scanning.
 	
 	var scanDataFormatted = cleanUpScanData(formatted[scanThetaMinIndex], formatted[scanThetaMaxIndex], formatted[scanRangeListIndex]); //This converts the strings into useable numbers and arrays.
-	var scanThetaMin = scanDataFormatted[0];
-	var scanThetaMax = scanDataFormatted[1];
-	var scanRangeList = scanDataFormatted[2];
-	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This information is actually in the message, but I prefer to calculate it myself.
+	var scanThetaMin = scanDataFormatted[0]; //This is the minimum angle tested by the laser scanner.
+	var scanThetaMax = scanDataFormatted[1]; //This is the maximum angle tested by the laser scanner.
+	var scanRangeList = scanDataFormatted[2]; //This is the list of ranges detected by the laser scanner.
+	var scanAngleIncrement = (scanThetaMax - scanThetaMin) / scanRangeList.length; //This is the increment for each range.
+																				   //The first one is at the minimum angle, the second one is at the minimum angle plus this, the third one is at the minimum angle plus twice this, etc.
 	
-	var currentPose = [robotPosition[0], robotPosition[1], robotOrientationTheta];
+	var currentPose = [robotPosition[0], robotPosition[1], robotOrientationTheta]; //This is the robot's current pose, in the form [x, y, θ].
 
-	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList);
+	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList); //The pose data also includes the minimum and maximum angle, as well as the increment and range list.
 
-	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //This is where the bulk of my computing time is, as this includes the ICP loop.
-	if(goodScan) {
+	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
+	if(goodScan) { //If it's a good scan, all of the data is saved.
 		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
-		poses.push(currentPoseData);
+		poses.push(currentPoseData); //This saves the pose for later use in loop closure.
 	}
 
-	context.lineWidth = 1 / scaleFactor; //This makes sure the lines don't get really thick when the context is zoomed in.
+	//This is a series of canvas operations designed to clear and reset the canvas for the next frame to be drawn.
+	context.lineWidth = 1 / scaleFactor; //This resizes the lines drawn relative to the canvas's scale.
+	clearCanvas(); //This clears the canvas by resetting the transforms and drawing a giant white rectangle over everything.
+	setConstantCanvasTransforms(); //This does some basic transforms that are always applied in the same way. For example, flipping the context so y+ is up instead of down, and moving 0, 0 to the center of the canvas.
+	drawRobotMarker(); //This draws a marker for the robot's current location. The marker also shows the direction the robot is facing.
+	setCanvasTransforms(robotPosition, robotOrientationTheta); //This then implements the transforms from the robot's last position, as explained above when robotPosition and robotOrientationTheta are defined.
 
-	clearCanvas();
-	setConstantCanvasTransforms();
-	drawRobotMarker();
-	setCanvasTransforms(robotPosition, robotOrientationTheta);
-	drawRobotPath();
-	drawRobotMap();
+	//This is a series of functions that actually draw the frame.
+	drawRobotPath(); //This draws the path the robot has taken.
+	drawRobotMap(); //This draws the edges the laser scanner has detected.
 }
 function badDataMainLoop(formatted) {
-	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") {
-		//console.log("Error! The message is of an unexpected format! (Old data)");
+	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") { //If either piece of the message has the OLD message, this means some of the data is old data.
+		console.log("Error! The message is of an unexpected format! (Old data)");
 	}
-	else {
-		console.log("Error! The message is of an unexpected format!\n" + formatted); //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.k
+	else { //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.
+		console.log("Error! The message is of an unexpected format!\n" + formatted);
 	}
 }
 
