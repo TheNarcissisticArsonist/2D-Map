@@ -63,6 +63,7 @@ var angleOffset = 0; //Calculated with ICP to correct the robot's orientation.
 var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var highlightedPoses = []; //A list of poses to highlight on the map, to make scan matching easier.
+var recalculatingMap = false; //If the map is being recalculated, you shouldn't be getting new scans.
 
 //HTML Elements
 var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton;
@@ -129,7 +130,12 @@ function mainLoop(data) {
 function notCurrentlyScanning(data) {
 	//This section of code can be activated by clicking the button to stop scanning on the webpage.
 	//It allows you to zoom in and out, without taking new scans. Since ICP isn't being run, it renders much more quickly.
-	console.log("Not currently scanning.");
+	if(recalculatingMap) {
+		console.log("Recalculating map...");
+	}
+	else {
+		console.log("Not currently scanning.");
+	}
 
 	//These are saved, to keep the screen centered on where the robot would be. I may rework this later.
 	var robotPosition = lastPosition;
@@ -655,6 +661,11 @@ function removeDuplicates(scan) {
 	return scan;
 }
 function toggleScanning() {
+	if(recalculatingMap) {
+		console.log("The map is being recalculated! Please wait before attempting to get new scans!");
+		return;
+	}
+
 	//This allows you to still zoom in and out on the map when the map is paused.
 	currentlyScanning = !currentlyScanning;
 	overallCanvasDrag = [0, 0];
@@ -850,6 +861,8 @@ function runLoopClosure() {
 		}
 	}
 
+	recalculatingMap = true;
+
 	updateSLAM(oldLastPose);
 	console.log(optimizedScanRecord);
 	deleteOldMap();
@@ -901,6 +914,9 @@ function recalculateMapFromPoses(iteration) {
 		window.setTimeout(function() {
 			recalculateMapFromPoses(i);
 		}, poseRecalculationDelay);
+	}
+	else {
+		recalculatingMap = false;
 	}
 }
 function loopClosureButtonClicked() {
