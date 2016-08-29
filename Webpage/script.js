@@ -25,7 +25,6 @@ var minICPComparePoints = 3000; //The minimum number of points ICP must use to c
 var maximumPointMatchDistance = 2; //The maximum distance between matched points for ICP.
 var goodCorrespondenceThreshold = 0; //If during point matching, the distance between two matched points is less than this, don't test any further points for a closer match.
 var goodCorrespondenceThresholdSquared = Math.pow(goodCorrespondenceThreshold, 2); //If this is to be implemented, distanceSquared will be faster.
-var maxNumFailedScans = 10; //How many scans have to fail in a row to go to user-manual fit.
 var numRecentScans = 100; //How many scans to show when recentScansOnly is true.
 var mapIncrementScanning = 1; //The value for mapIncrement used while scanning.
 var mapIncrementPretty = 1; //The value for mapIncrement used while not scanning.
@@ -298,56 +297,55 @@ function storePosition(position) {
 	//This is its own function because I might later want to downsample, or do some other manipulation on the point.
 }
 function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPosition, robotAngle) {
-	//Throughout this function, the scan is gradually refined from a list of distances to a set of newfound points to add to the map.
-	var robotXYList = convertScanToRobotXY(angleMin, angleMax, rangeList, angleIncrement);
-	var globalXYList = convertRobotXYToGlobalXY(robotXYList, robotPosition, robotAngle);
-	var cleanGlobalXYList = removeScanNaN(globalXYList);
+	//Throughout this function, the scan is gradually refined from a list of distances to a set of *new* points to add to the map.
+	var robotXYList = convertScanToRobotXY(angleMin, angleMax, rangeList, angleIncrement); //This converts the list of ranges to a set of xy points in the robot's coordinate system.
+	var globalXYList = convertRobotXYToGlobalXY(robotXYList, robotPosition, robotAngle); //This converts the xy points from the robot's coordinate system to the global coordinate system.
+	var cleanGlobalXYList = removeScanNaN(globalXYList); //This removes all undefined points (NaN, NaN). These are present because sometimes, the scanner returns NaN for various directions.
+														 //If I didn't filter these out, strange errors would be thrown later in the program, saying that various things weren't defined.
+														 //Or worse, the map would be screwed up by NaN values being plugged into the draw commands!
 
 	if(optimizedScanRecord.length > 0) {
 		//This is only run when there's at least one scan already stored, or there would be nothing for ICP to compare to!
-		//if(numFailedScans < maxNumFailedScans) {
-		cleanGlobalXYList = runICP(cleanGlobalXYList);
-		var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
-		//}
-		//else {
-		//	manualFit(cleanGlobalXYList);
-		//}
+		cleanGlobalXYList = runICP(cleanGlobalXYList); //Oftentimes, there's a bit of error from the odometry. ICP corrects this.
+		var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList); //This looks for any duplicate points in the new scan, and removes them.
 	}
 	else {
-		var reducedGlobalXYList = cleanGlobalXYList.slice(0);
+		var reducedGlobalXYList = cleanGlobalXYList.slice(0); //There's no reason to look for duplicate points, because this is the first scan.
 	}
 
-	if(reducedGlobalXYList.length > 0) {
-		optimizedScanRecord.push(cleanGlobalXYList);
-		return true; //This means it's a good scan.
+	if(reducedGlobalXYList.length > 0) { //If ICP fails, the scan will be erased.
+		optimizedScanRecord.push(cleanGlobalXYList); //This pushes the new points to the record of scanned points.
+		return true; //This tells the main loop that it's a good scan and should be saved.
 	}
 	else {
-		return false; //Bad scan.
+		return false; //This tells the main loop that this was a bad scan and should not be saved.
 	}
 }
 function convertScanToRobotXY(min, max, rangeList, increment) {
 	var currentTheta, x, y;
 	var scan = [];
-	for(var i=0; i<rangeList.length; ++i) {
-		//This is basically converting a set of polar coordinates into cartesian coordinates, and then translating down 22 cm.
-		//The downwards translation is because the laser scanner on the robot is ~22 cm in front of the center of mass, which is what odometry uses.
-		currentTheta = min + (i * increment);
-		x = rangeList[i] * Math.cos(currentTheta);
-		y = rangeList[i] * Math.sin(currentTheta) * -1;
-		x += 0.22;
-		scan.push([x, y]);
+	for(var i=0; i<rangeList.length; ++i) {.
+		currentTheta = min + (i * increment); //currentTheta is the heading of the range that's being converted to xy coordinates.
+		x = rangeList[i] * Math.cos(currentTheta); //x = rcos(θ)
+		y = rangeList[i] * Math.sin(currentTheta) * -1; //y = -rsin(θ) I'm not sure where the negative comes from, but it's needed.
+		x += 0.22; //The odometry is based on the center of mass, but the laser scanner is set approximately 22 cm forward of the center of mass. This compsensates for the discrepency.
+		scan.push([x, y]); //The scan array is the array of points to be returned to the processScanData function.
 	}
 	return scan;
 }
 function convertRobotXYToGlobalXY(scan, position, theta) {
-	var x, y, x1, y1;
+	var x, y, x1, y1; //(x, y) -> (x1, y1)
 	for(var i=0; i<scan.length; ++i) {
+		//Really, this is just matrix multiplication that I've manually implemented.
 		x = scan[i][0];
 		y = scan[i][1];
 		x1 = (x * Math.cos(-theta)) + (y * Math.sin(-theta));
 		y1 = (-1 * x * Math.sin(-theta)) + (y * Math.cos(-theta));
+		//And this is matrix addition.
 		scan[i][0] = x1 + position[0];
 		scan[i][1] = y1 + position[1];
+		//The overall formula is: [x1] = [ cos(-θ), sin(-θ)] * [x] + [x0]
+		//						  [y1]   [-sin(-θ), cos(-θ)]   [y]   [y0]
 	}
 	return scan;
 }
@@ -355,40 +353,44 @@ function removeScanNaN(scanList) {
 	var cleanScan = [];
 	for(var i=0; i<scanList.length; ++i) {
 		if(!(isNaN(scanList[i][0]) || isNaN(scanList[i][1]))) {
+			//For each point in the scan, if neither the x nor the y coordinate is not a number (in other words, both x and y are numbers), save the point.
 			cleanScan.push(scanList[i]);
 		}
 	}
 	return cleanScan;
 }
 function distance(pointA, pointB) {
-	//This is just an implementation of the distance formula.
+	//This is just an implementation of the distance formula. It implements the distanceSquared function, and then takes the square root, for the purposes of not rewriting that code.
 	return Math.sqrt(distanceSquared(pointA, pointB));
 }
 function distanceSquared(pointA, pointB) {
 	//This is the distance formula without the square root. When simply comparing to a constant, this is faster, as you can just square the constant.
+	//Finding the square of a number is MUCH quicker than finding its square root.
 	return Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2);
 }
-function enterZoom() { //Change the scale factor based on user input.
-	rawFactor = enterZoomTextArea.value;
-	console.log(rawFactor);
+function enterZoom() { //Change the scale factor (zoom) of the map based on user input.
+	rawFactor = enterZoomTextArea.value; //This is literally whatever the user types into the box on the page.
+	console.log(rawFactor); //I print this out just in case there's an issue.
 	if(!isNaN(rawFactor)) { //Make sure it's a number.
 		if(Number(rawFactor) > 0) { //Make sure it's positive.
-			scaleFactor = scaleFactorMultiplier*Number(rawFactor);
+			scaleFactor = scaleFactorMultiplier*Number(rawFactor); //Calculate the new scale factor.
 		}
 	}
 }
 function clearCanvas() {
+	//This completely erases the entire canvas, so the next frame can be drawn.
 	context.setTransform(1, 0, 0, 1, 0, 0); //Reset all transforms on the context.
-	context.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas.
-	context.beginPath();
+	context.clearRect(0, 0, canvas.width, canvas.height); //Clear the canvas, by drawing a giant white rectangle over everything.
+	context.beginPath(); //This makes sure that context.stroke() will not draw any lines from the previous line path (the one that was erased).
 }
 function setConstantCanvasTransforms() {
+	//This sets several canvas transforms that are universally used.
 	context.transform(1, 0, 0, 1, canvas.width/2, canvas.height/2); //Put 0, 0 in the center.
 	context.transform(1, 0, 0, -1, 0, 0); //Flip the canvas so y+ is up.
 	context.transform(scaleFactor, 0, 0, scaleFactor, 0, 0); //Scale the canvas.
 }
 function drawRobotMarker() {
-	//This will draw a circle around the center for the robot marker.
+	//This will draw a circle around the robot's position.
 	context.beginPath();
 	context.arc(0, 0, robotMarkerRadius, 0, 2*Math.PI);
 	context.stroke();
