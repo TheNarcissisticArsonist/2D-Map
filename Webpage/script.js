@@ -324,7 +324,7 @@ function processScanData(angleMin, angleMax, rangeList, angleIncrement, robotPos
 function convertScanToRobotXY(min, max, rangeList, increment) {
 	var currentTheta, x, y;
 	var scan = [];
-	for(var i=0; i<rangeList.length; ++i) {.
+	for(var i=0; i<rangeList.length; ++i) {
 		currentTheta = min + (i * increment); //currentTheta is the heading of the range that's being converted to xy coordinates.
 		x = rangeList[i] * Math.cos(currentTheta); //x = rcos(θ)
 		y = rangeList[i] * Math.sin(currentTheta) * -1; //y = -rsin(θ) I'm not sure where the negative comes from, but it's needed.
