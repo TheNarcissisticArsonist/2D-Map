@@ -209,7 +209,7 @@ function normalMainLoop(formatted) {
 }
 function badDataMainLoop(formatted) {
 	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") { //If either piece of the message has the OLD message, this means some of the data is old data.
-		console.log("Error! The message is of an unexpected format! (Old data)");
+		//console.log("Error! The message is of an unexpected format! (Old data)");
 	}
 	else { //If it's not a good message, it's not an empty message, and it's not an old message, print whatever weird crap came through the socket.
 		console.log("Error! The message is of an unexpected format!\n" + formatted);
@@ -835,21 +835,24 @@ function runLoopClosure() {
 
 				var PbPrime = numeric.dot(Pa, Tab);
 
-				var angleInformationVector = numeric.dot(PbPrime, [1, 0, 0]);
+				var angleInformationVector = numeric.dot(PbPrime, [[1], [0], [0]]);
 				var angle = Math.atan2(angleInformationVector[1], angleInformationVector[0]);
 
-				var translationInformationVector = numeric.dot(PbPrime, [0, 0, 1]);
+				var translationInformationVector = numeric.dot(PbPrime, [[0], [0], [1]]);
 
 				var r = [
-					translationInformationVector[0] - poses[constraints[i].b].pose[0],
-					translationInformationVector[1] - poses[constraints[i].b].pose[1],
-					angle - poses[constraints[i].b].pose[2]
+					[translationInformationVector[0] - poses[constraints[i].b].pose[0]],
+					[translationInformationVector[1] - poses[constraints[i].b].pose[1]],
+					[angle - poses[constraints[i].b].pose[2]]
 				];
 
-				while(r[2] > 2 * Math.PI) { r[2] -= 2 * Math.PI; }
-				while(r[2] < 0) { r[2] += 2 * Math.PI; }
+				while(r[2][0] > 2 * Math.PI) { r[2][0] -= 2 * Math.PI; }
+				while(r[2][0] < 0) { r[2][0] += 2 * Math.PI; }
 
-				var d = numeric.dot(2, numeric.dot(numeric.inv(numeric.dot(numeric.dot(numeric.transpose(R), constraints[i].sigma), R)), r));
+				var d = numeric.dot(numeric.inv(numeric.dot(numeric.dot(numeric.transpose(R), constraints[i].sigma), R)), r);
+				d[0][0] *= 2;
+				d[1][0] *= 2;
+				d[2][0] *= 2;
 
 				for(var j=0; j<3; ++j) {
 					var alpha = 1/(gamma[j] * Math.pow(iteration, loopClosureIterationPower));
@@ -860,8 +863,12 @@ function runLoopClosure() {
 					}
 
 					var beta = (constraints[i].b - constraints[i].a) * d[j] * alpha;
-					if(Math.abs(beta) > Math.abs(r[j])) {
-						beta = r[j];
+					if(Math.abs(beta) > Math.abs(r[j][0])) {
+						beta = r[j][0];
+						var beta_residual = true;
+					}
+					else {
+						var beta_residual = false;
 					}
 
 					var dPose = 0;
