@@ -36,6 +36,7 @@ var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map da
 var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
+var percentageOfPosesSaved = 25; //What percentage of scans in the initial run are saved as poses. Scans to be saved are selected at random.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -193,7 +194,9 @@ function normalMainLoop(formatted) {
 	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
 	if(goodScan) { //If it's a good scan, all of the data is saved.
 		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
-		poses.push(currentPoseData); //This saves the pose for later use in loop closure.
+		if(Math.random() * 100 < percentageOfPosesSaved) {
+			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
+		}
 	}
 
 	//This is a series of canvas operations designed to clear and reset the canvas for the next frame to be drawn.
@@ -926,7 +929,7 @@ function recalculateMapFromPoses(iteration) {
 	var reducedGlobalXYList = removeDuplicates(cleanGlobalXYList);
 
 	if(reducedGlobalXYList.length > 0) {
-		optimizedScanRecord.push(cleanGlobalXYList);
+		optimizedScanRecord.push(reducedGlobalXYList);
 	}
 
 	++i;
