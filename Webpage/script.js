@@ -874,7 +874,7 @@ function runLoopClosure() {
 					var dPose = 0;
 					for(var k=constraints[i].a+1; k<poses.length; ++k) {
 						if(k >= constraints[i].a+1 && k <= constraints[i].b) {
-							dPose += beta/M[k][j]/totalWeight;
+							dPose += (beta/M[k][j])/totalWeight;
 						}
 						poses[k].pose[j] += dPose;
 					}
@@ -889,7 +889,6 @@ function runLoopClosure() {
 	console.log(optimizedScanRecord);
 	deleteOldMap();
 	recalculateMapFromPoses(0);
-	console.log(optimizedScanRecord);
 }
 function updateSLAM(oldPose) {
 	var newPose = poses[poses.length - 1];
@@ -939,6 +938,7 @@ function recalculateMapFromPoses(iteration) {
 	}
 	else {
 		recalculatingMap = false;
+		console.log(optimizedScanRecord);
 	}
 }
 function loopClosureButtonClicked() {
