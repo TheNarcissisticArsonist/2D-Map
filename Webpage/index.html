@@ -4,11 +4,15 @@
 		<title>2D Map</title>
 	</head>
 	<body style="margin: 0px">
-		<canvas id="mainCanvas" style="border: 1px solid black" width="800px" height="800px"></canvas>
-		<svg height="200px" width="200px" style="vertical-align: top; padding: 100px 100px;">
-			<circle cx="100" cy="100" r="115" stroke-width="0" fill="blue" id="outerCircle" />
-			<circle cx="100" cy="100" r="75" stroke-width="0" fill="white" />
-		</svg>
+		<canvas id="mainCanvas" style="display: inline-block; border: 1px solid black" width="800px" height="800px"></canvas>
+		<div style="display: inline-block; vertical-align: top;">	
+			<svg height="200px" width="200px" style="display: inline-block; vertical-align: top; padding: 100px 100px;">
+				<circle cx="100" cy="100" r="115" stroke-width="0" fill="blue" id="outerCircle" />
+				<circle cx="100" cy="100" r="75" stroke-width="0" fill="white" />
+			</svg>
+			<br><br>
+			<pre id="usefulData" style="display: inline-block; text-align: right"></pre>
+		</div>
 		<div id="start" style="float: right; display: inline-block; background-color: red; padding: 25px;">Start</div>
 		<br><br>
 		<div style="display: inline-block;">
@@ -19,18 +23,11 @@
 			<div id="enterUnHighlightScans" style="display: inline-block; background-color: red; padding: 5px;">Remove Highlighted Scan Index</div>
 		</div>
 		<div style="width: 25px; display: inline-block;"> <!-- Buffer space --> </div>
-		<div style = "display: inline-block; vertical-align: top;">
-			<div id="highlightAll" style="background-color: red; display: inline-block; padding: 5px;">Highlight All Poses</div>
-			<br><br>
-			<div id="unHighlightAll" style="background-color: red; display: inline-block; padding: 5px;">Unhighlight All Poses</div>
-		</div>
-		<div style="width: 25px; display: inline-block;"> <!-- Buffer space --> </div>
 		<div style="display: inline-block; vertical-align: top;">
 			<div id="toggleScanning" style="background-color: red; display: inline-block; padding: 5px;">Toggle Scanning</div>
 			<br><br>
 			<div id="loopClosure" style="background-color: red; display: inline-block; padding: 5px;">Run Loop Closure</div>
 		</div>
-		<div id="dataPrintout"></div>
 		<script type="text/javascript" src="numeric-1.2.6.js"></script>
 		<script type="text/javascript" src="script.js"></script>
 	</body>

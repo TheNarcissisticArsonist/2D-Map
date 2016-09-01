@@ -39,6 +39,8 @@ var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the ci
 var highlightedPoseMarkerAngle = robotMarkerArrowAngle; //The angle of the arrow displaying the robot's direction in a pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
 var minimumPoseDistance = 0.1; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
+var icpIterationsToKeep = 20; //How many iterations back ICP should record the success of. Used for displaying in the data area.
+var icpLoopWarnCount = 50; //The number of ICP iterations before the program warns you.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -67,9 +69,11 @@ var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used
 var highlightedPoses = []; //A list of poses to highlight on the map, to make scan matching easier.
 var recalculatingMap = false; //If the map is being recalculated, you shouldn't be getting new scans.
 var highlightAll = true; //If this is true, all scans will be highlighted.
+var lastScansICPIterationCount = []; //The ICP iteration counts for the last x scans. Most recent is 0.
+var messageCounter = 0; //The number of valid messages that gave good scans the page has received from the websocket.
 
 //HTML Elements
-var canvas, context, dataArea, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton, unHighlightedScanTextArea, unHighlightedScanButton, highlightAllButton, unHighlightAllButton;
+var canvas, context, dataArea, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton, unHighlightedScanTextArea, unHighlightedScanButton, usefulDataArea;
 
 function setup() {
 	console.log("Running setup function.");
@@ -96,10 +100,7 @@ function setup() {
 	unHighlightedScanTextArea = document.getElementById("youUnHighlightScans"); //This is the text area where you can input specific scans to be unhighlighted.
 	unHighlightedScanButton = document.getElementById("enterUnHighlightScans"); //This is the html element of the button to input an unhighlighted scan.
 	unHighlightedScanButton.addEventListener("click", userScanUnHighlighted); //And this is its corresponding event listener.
-	highlightAllButton = document.getElementById("highlightAll"); //This is the html element of the button to highlight all scans.
-	highlightAllButton.addEventListener("click", function() {highlightAll = true;}); //And this is its event listener.
-	unHighlightAllButton = document.getElementById("unHighlightAll"); //This is the html element of the button to unhighlight all scans.
-	unHighlightAllButton.addEventListener("click", function() {highlightAll = false;}); //And this is its event listener.
+	usefulDataArea = document.getElementById("usefulData"); //The success/failure of scan data and some other stuff are shown here.
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -166,6 +167,9 @@ function notCurrentlyScanning(data) {
 	drawRobotMap(); //This draws the edges the laser scanner has detected.
 	drawHighlightedPoses(); //This draws little circles to highlight any poses the user has specified.
 
+	usefulDataArea.innerHTML = "";
+	usefulDataArea.style.backgroundColor = "#ffffff";
+
 	ws.send("Please do not reply."); //The server will see this and do nothing. This just keeps the websocket from timing out.
 
 	requestAnimationFrame(function() { mainLoop("niceme.me"); }); //This calls the main loop function again, with irrelevant data. Since currentlyScanning is false, what's input doesn't matter.
@@ -199,6 +203,7 @@ function normalMainLoop(formatted) {
 	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
 
 	if(goodScan) { //If it's a good scan, the pose data is saved (scan data gets saved inside the processScanData function, with the same criteria).
+		++messageCounter; //The scan was received, all good, etc.
 		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 		if(farApart(currentPoseData)) { //If the poses are far apart, there's a percent chance the pose will be saved for loop closure.
 			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
@@ -224,6 +229,8 @@ function normalMainLoop(formatted) {
 	drawRobotPath(); //This draws the path the robot has taken.
 	drawRobotMap(); //This draws the edges the laser scanner has detected.
 	drawHighlightedPoses(); //This draws little circles to highlight any poses the user has specified.
+
+	updateDataArea();
 }
 function badDataMainLoop(formatted) {
 	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") { //If either piece of the message has the OLD message, this means some of the data is old data.
@@ -491,12 +498,20 @@ function runICP(scan) {
 		++totalLoopCount;
 		if(totalLoopCount >= maxICPLoopCount) {
 			console.log("Fail!");
+			totalLoopCount = Infinity;
+			usefulDataArea.style.backgroundColor = "#ff0000"; //Red
 			++numFailedScans;
 			currentScan = [];
 			scanAngleError = 0;
 			scanPositionError = [0, 0];
 			scanTransformError = [[1, 0], [0, 1]];
 			break;
+		}
+		else if(totalLoopCount >= icpLoopWarnCount) {
+			usefulDataArea.style.backgroundColor = "#ffff00"; //Yellow
+		}
+		else if(totalLoopCount >= 0) {
+			usefulDataArea.style.backgroundColor = "#00ff00"; //Green
 		}
 		iterationTotalSquaredDistance = 0;
 		pointSet1 = [];
@@ -546,6 +561,13 @@ function runICP(scan) {
 	positionOffset = numeric.add(positionOffset, scanPositionError);
 
 	//console.log("Finished after " + totalLoopCount + "\n\n\n\n\n");
+	
+	if(messageCounter % 3 == 0) {
+		updateICPIterationRecord(totalLoopCount + " -");
+	}
+	else {
+		updateICPIterationRecord(totalLoopCount + "&nbsp;&nbsp;");
+	}
 
 	return currentScan;
 }
@@ -1018,6 +1040,24 @@ function farApart(pose) {
 	else {
 		return false;
 	}
+}
+function updateDataArea() {
+	var dataString = "ICP Iteration Counts<br>";
+	for(var i=0; i<lastScansICPIterationCount.length; ++i) {
+		dataString += lastScansICPIterationCount[i];
+		dataString += "<br>";
+	}
+	usefulDataArea.innerHTML = dataString;
+}
+function updateICPIterationRecord(iterationCount) {
+	while(lastScansICPIterationCount.length < icpIterationsToKeep) {
+		lastScansICPIterationCount.push(null);
+	}
+
+	for(var i=lastScansICPIterationCount.length - 1; i>0; --i) {
+		lastScansICPIterationCount[i] = lastScansICPIterationCount[i-1];
+	}
+	lastScansICPIterationCount[0] = iterationCount;
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList, originalScanIndex) {
