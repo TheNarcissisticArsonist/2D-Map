@@ -38,7 +38,7 @@ var mapDataDisplayPageHeight = 500; //The same as above, but this time, the heig
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
 var highlightedPoseMarkerAngle = robotMarkerArrowAngle; //The angle of the arrow displaying the robot's direction in a pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
-var minimumPoseDistance = 0.1; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
+var minimumPoseDistance = 0.25; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
 var icpIterationsToKeep = 20; //How many iterations back ICP should record the success of. Used for displaying in the data area.
 var icpLoopWarnCount = 50; //The number of ICP iterations before the program warns you.
 
