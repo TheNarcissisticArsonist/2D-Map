@@ -65,10 +65,10 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var highlightedPoses = []; //A list of poses to highlight on the map, to make scan matching easier.
 var recalculatingMap = false; //If the map is being recalculated, you shouldn't be getting new scans.
+var highlightAll = false; //If this is true, all scans will be highlighted.
 
 //HTML Elements
-var canvas, context, dataArea, updateZoomButton, enterZoomTextArea, enterZoomButton, autoZoomButton, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton;
-var unHighlightedScanTextArea, unHighlightedScanButton;
+var canvas, context, dataArea, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton, unHighlightedScanTextArea, unHighlightedScanButton, highlightAllButton, unHighlightAllButton;
 
 function setup() {
 	console.log("Running setup function.");
@@ -89,13 +89,16 @@ function setup() {
 															  //It's set to the whole body because sometimes, when you're dragging, you go outside of the element.
 	document.getElementById("toggleScanning").addEventListener("click", toggleScanning); //This event listener is for the toggle scanning button.
 	document.getElementById("loopClosure").addEventListener("click", loopClosureButtonClicked); //This event listener is for the loop closure button.
-	
 	highlightedScanTextArea = document.getElementById("youHighlightScans"); //This is the text area where you can input specific scans to be highlighted.
 	highlightedScanButton = document.getElementById("enterHighlightScans"); //This is the html element of the button to input a highlighted scan.
 	highlightedScanButton.addEventListener("click", userScanHighlighted); //And this is its corresponding click event listener.
 	unHighlightedScanTextArea = document.getElementById("youUnHighlightScans"); //This is the text area where you can input specific scans to be unhighlighted.
 	unHighlightedScanButton = document.getElementById("enterUnHighlightScans"); //This is the html element of the button to input an unhighlighted scan.
 	unHighlightedScanButton.addEventListener("click", userScanUnHighlighted); //And this is its corresponding event listener.
+	highlightAllButton = document.getElementById("highlightAll"); //This is the html element of the button to highlight all scans.
+	highlightAllButton.addEventListener("click", function() {highlightAll = true;}); //And this is its event listener.
+	unHighlightAllButton = document.getElementById("unHighlightAll"); //This is the html element of the button to unhighlight all scans.
+	unHighlightAllButton.addEventListener("click", function() {highlightAll = false;}); //And this is its event listener.
 
 	dataArea = document.getElementById("dataPrintout"); //As the program receives data, this area on the webpage can be used to record it.
 
@@ -382,15 +385,6 @@ function distanceSquared(pointA, pointB) {
 	//This is the distance formula without the square root. When simply comparing to a constant, this is faster, as you can just square the constant.
 	//Finding the square of a number is MUCH quicker than finding its square root.
 	return Math.pow(pointB[0]-pointA[0], 2) + Math.pow(pointB[1]-pointA[1], 2);
-}
-function enterZoom() { //Change the scale factor (zoom) of the map based on user input.
-	rawFactor = enterZoomTextArea.value; //This is literally whatever the user types into the box on the page.
-	console.log(rawFactor); //I print this out just in case there's an issue.
-	if(!isNaN(rawFactor)) { //Make sure it's a number.
-		if(Number(rawFactor) > 0) { //Make sure it's positive.
-			scaleFactor = scaleFactorMultiplier*Number(rawFactor); //Calculate the new scale factor.
-		}
-	}
 }
 function clearCanvas() {
 	//This completely erases the entire canvas, so the next frame can be drawn.
@@ -712,10 +706,6 @@ function toggleScanning() {
 		mapIncrement = mapIncrementPretty;
 	}
 }
-function manualFit(scan) {
-	//Honestly, I don't even know if I'm going to do this.
-	//I want to talk to someone else about the idea before I do it.
-}
 function mouseMoved(event) {
 	currentMouseCoords[0] = event.clientX;
 	currentMouseCoords[1] = window.innerHeight - event.clientY;
@@ -973,12 +963,23 @@ function saveMap() {
 }
 function drawHighlightedPoses() {
 	context.strokeStyle = "#0000ff";
-	for(var i=0; i<highlightedPoses.length; ++i) {
-		var pose = poses[highlightedPoses[i]];
-		context.beginPath();
-		context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
-		context.lineTo(pose.pose[0], pose.pose[1]);
-		context.stroke();
+	if(highlightAll) {
+		for(var i=0; i<poses.length; ++i) {
+			var pose = poses[i];
+			context.beginPath();
+			context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
+			context.lineTo(pose.pose[0], pose.pose[1]);
+			context.stroke();
+		}
+	}
+	else {
+		for(var i=0; i<highlightedPoses.length; ++i) {
+			var pose = poses[highlightedPoses[i]];
+			context.beginPath();
+			context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
+			context.lineTo(pose.pose[0], pose.pose[1]);
+			context.stroke();
+		}
 	}
 	context.strokeStyle = "#000000";
 }
@@ -1036,8 +1037,3 @@ function constraint(a, b, t, sigma) {
 //This actually sets it up so if you click "setup", the program starts.
 startButton = document.getElementById("start");
 startButton.addEventListener("click", setup);
-
-//These are some of the html elements used.
-enterZoomTextArea = document.getElementById("youSetZoom");
-enterZoomButton = document.getElementById("enterZoom");
-enterZoomButton.addEventListener("click", enterZoom);
