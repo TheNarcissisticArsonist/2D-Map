@@ -193,7 +193,7 @@ function normalMainLoop(formatted) {
 	
 	var currentPose = [robotPosition[0], robotPosition[1], robotOrientationTheta]; //This is the robot's current pose, in the form [x, y, θ].
 
-	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList); //The pose data also includes the minimum and maximum angle, as well as the increment and range list.
+	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList, optimizedScanRecord.length); //The pose data also includes the minimum and maximum angle, as well as the increment and range list.
 
 	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
 
@@ -224,6 +224,7 @@ function normalMainLoop(formatted) {
 	//This is a series of functions that actually draw the frame.
 	drawRobotPath(); //This draws the path the robot has taken.
 	drawRobotMap(); //This draws the edges the laser scanner has detected.
+	drawHighlightedPoses(); //This draws little circles to highlight any poses the user has specified.
 }
 function badDataMainLoop(formatted) {
 	if(formatted[0] == "OLD" || formatted[formatted.length - 1] == "OLD") { //If either piece of the message has the OLD message, this means some of the data is old data.
@@ -669,8 +670,11 @@ function removeDuplicates(scan) {
 			for(k=allScans[j].length - 1; k>=0; --k) {
 				var d = distanceSquared(scan[i], allScans[j][k]);
 				if(d < scanDensityDistanceSquared) {
+					//console.log(j+lowIndex);
+					//console.log(optimizedScanRecord[j+lowIndex]);
+					//console.log("\n\n\n");
 					optimizedScanRecord[j + lowIndex].splice(k, 1);
-					if(optimizedScanRecord[j].length == 0) {
+					if(optimizedScanRecord[j + lowIndex].length == 0) {
 						optimizedScanRecord.splice(j + lowIndex, 1);
 					}
 					remove = true;
@@ -964,12 +968,20 @@ function saveMap() {
 function drawHighlightedPoses() {
 	context.strokeStyle = "#0000ff";
 	if(highlightAll) {
+		var startIndex = 0;
+		if(recentScansOnly) { //This code is copied over from drawRobotMap, so only recent saved poses display.
+			startIndex = (optimizedScanRecord.length - numRecentScans) - (optimizedScanRecord.length % mapIncrement);
+		}
+		var endIndex = optimizedScanRecord.length;
+
 		for(var i=0; i<poses.length; ++i) {
 			var pose = poses[i];
-			context.beginPath();
-			context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
-			context.lineTo(pose.pose[0], pose.pose[1]);
-			context.stroke();
+			if(pose.originalScanIndex >= startIndex && pose.originalScanIndex < endIndex) {
+				context.beginPath();
+				context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
+				context.lineTo(pose.pose[0], pose.pose[1]);
+				context.stroke();
+			}
 		}
 	}
 	else {
@@ -1020,12 +1032,13 @@ function farApart(pose) {
 	return takeScan;
 }
 
-function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
+function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList, originalScanIndex) {
 	this.pose = pose;
 	this.scanMinTheta = scanMinTheta;
 	this.scanMaxTheta = scanMaxTheta;
 	this.scanThetaIncrement = scanThetaIncrement;
 	this.scanRangeList = scanRangeList;
+	this.originalScanIndex = originalScanIndex;
 }
 function constraint(a, b, t, sigma) {
 	this.a = a;
