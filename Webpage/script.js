@@ -14,7 +14,8 @@ var distanceDisplayThresholdSquared = Math.pow(distanceDisplayThreshold, 2); //I
 var scanThetaMinIndex = 37; //This is the formatted array index of the minimum angle for the scan.
 var scanThetaMaxIndex = 38; //Same, but for the maximum angle.
 var scanRangeListIndex = 44; //Same, but for the list of ranges.
-var minimumPositionDistanceToRecord = 0.01; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
+var minimumPositionDistanceToRecord = 0.001; //If the distance between two position samples is less than this, only one of the points will be kept. This is in meters.
+var minimumRotationDistanceToRecord = 0.001; //Same as above, but taking into account rotation.
 var icpAverageDistanceTraveledThreshold = 0.01; //The average distance traveled per point must be less than this for ICP to finish.
 var icpAverageDistanceTraveledThresholdSquared = Math.pow(icpAverageDistanceTraveledThreshold, 2); //This is squared for use with the distanceSquared function.
 var icpNoMovementCounterThreshold = 5; //ICP must lead to no movement at least this many times for it to finish.
@@ -191,10 +192,10 @@ function normalMainLoop(formatted) {
 
 	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList); //The pose data also includes the minimum and maximum angle, as well as the increment and range list.
 
-	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
-	if(goodScan) { //If it's a good scan, all of the data is saved.
-		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
-		if(Math.random() * 100 < percentageOfPosesSaved) {
+	if(farApart(currentPoseData)) {
+		var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
+		if(goodScan) { //If it's a good scan, all of the data is saved.
+			storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
 		}
 	}
@@ -986,6 +987,25 @@ function userScanUnHighlighted() {
 			highlightedPoses.splice(metaIndex, 1);
 		}
 	}
+}
+function farApart(pose) {
+	if(poses.length == 0) {
+		return true;
+	}
+	
+	oldPos = poses[poses.length - 1].pose.slice(0, 2);
+	oldRot = poses[poses.length - 1].pose.slice(2, 3);
+	newPos = pose.pose.slice(0, 2);
+	newRot = pose.pose.slice(2, 3);
+
+	if((Math.abs(oldRot - newRot) >= minimumRotationDistanceToRecord) || (distanceSquared(oldPos, newPos) >= minimumPositionDistanceToRecord)) {
+		var takeScan = true;
+	}
+	else {
+		var takeScan = false;
+	}
+
+	return takeScan;
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList) {
