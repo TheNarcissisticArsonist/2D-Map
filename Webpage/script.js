@@ -961,23 +961,23 @@ function drawHighlightedPoses() {
 		for(var i=0; i<poses.length; ++i) {
 			var pose = poses[i];
 			if(pose.originalScanIndex >= startIndex && pose.originalScanIndex < endIndex) {
-				context.beginPath();
-				context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
-				context.lineTo(pose.pose[0], pose.pose[1]);
-				context.stroke();
+				highlight(pose);
 			}
 		}
 	}
 	else {
 		for(var i=0; i<highlightedPoses.length; ++i) {
 			var pose = poses[highlightedPoses[i]];
-			context.beginPath();
-			context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
-			context.lineTo(pose.pose[0], pose.pose[1]);
-			context.stroke();
+			highlight(pose);
 		}
 	}
 	context.strokeStyle = "#000000";
+}
+function highlight(pose) {
+	context.beginPath();
+	context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
+	context.lineTo(pose.pose[0], pose.pose[1]);
+	context.stroke();
 }
 function userScanHighlighted() {
 	rawIndex = Number(highlightedScanTextArea.value);
