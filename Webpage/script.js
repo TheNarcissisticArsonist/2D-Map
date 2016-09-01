@@ -36,6 +36,7 @@ var loopClosureMaxIterations = 500; //The maximum number of iterations that loop
 var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map data for the purposes of saving data.
 var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
+var highlightedPoseMarkerAngle = robotMarkerArrowAngle; //The angle of the arrow displaying the robot's direction in a pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
 var minimumPoseDistance = 0.1; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
 
@@ -974,9 +975,16 @@ function drawHighlightedPoses() {
 	context.strokeStyle = "#000000";
 }
 function highlight(pose) {
+	var theta = pose.pose[2];
+	var r = highlightedPoseCircleRadius;
 	context.beginPath();
 	context.arc(pose.pose[0], pose.pose[1], highlightedPoseCircleRadius, 0, 2 * Math.PI);
-	context.lineTo(pose.pose[0], pose.pose[1]);
+	context.moveTo(pose.pose[0] + (r * Math.cos(theta)), pose.pose[1] + (r * Math.sin(theta)));
+	context.lineTo(pose.pose[0] - (r * Math.cos(theta + highlightedPoseMarkerAngle)), pose.pose[1] - (r * Math.sin(theta + highlightedPoseMarkerAngle)));
+	context.lineTo(pose.pose[0] - (r * Math.cos(theta - highlightedPoseMarkerAngle)), pose.pose[1] - (r * Math.sin(theta - highlightedPoseMarkerAngle)));
+	context.lineTo(pose.pose[0] + (r * Math.cos(theta)), pose.pose[1] + (r * Math.sin(theta)));
+	context.moveTo(pose.pose[0], pose.pose[1]);
+	context.lineTo(pose.pose[0] - (r * Math.cos(theta) * Math.cos(highlightedPoseMarkerAngle)), pose.pose[1] - (r * Math.sin(theta) * Math.cos(highlightedPoseMarkerAngle)))
 	context.stroke();
 }
 function userScanHighlighted() {
