@@ -651,38 +651,20 @@ function matchPoints(set1, set2) {
 	return indexPairs;
 }
 function removeDuplicates(scan) {
-	var allScans = [];
-	var lowIndex = optimizedScanRecord.length - scansToSearchBackForDuplicates;
-	var highIndex = optimizedScanRecord.length - 1; //Inclusive
-	for(var i=lowIndex; i<=highIndex; ++i) {
-		if(i >= 0) {
-			allScans.push(optimizedScanRecord[i]);
-		}
-		else {
-			++lowIndex;
-		}
-	}
-	var remove = false;
-	for(var i=scan.length - 1; i>=0; --i) {
-		remove = false;
-		var j, k;
-		for(j=allScans.length - 1; j>=0; --j) {
-			for(k=allScans[j].length - 1; k>=0; --k) {
-				var d = distanceSquared(scan[i], allScans[j][k]);
-				if(d < scanDensityDistanceSquared) {
-					//console.log(j+lowIndex);
-					//console.log(optimizedScanRecord[j+lowIndex]);
-					//console.log("\n\n\n");
-					optimizedScanRecord[j + lowIndex].splice(k, 1);
-					if(optimizedScanRecord[j + lowIndex].length == 0) {
-						optimizedScanRecord.splice(j + lowIndex, 1);
-					}
-					remove = true;
-					break;
-				}
-			}
-			if(remove) {
+	var startIndex = optimizedScanRecord.length - scansToSearchBackForDuplicates;
+	for(var i=0; i<scan.length; ++i) {
+		for(var j=optimizedScanRecord.length - 1; j>=startIndex; --j) {
+			if(j < 0) {
 				break;
+			}
+			for(var k=optimizedScanRecord[j].length - 1; k>=0; --k) {
+				var d = distanceSquared(scan[i], optimizedScanRecord[j][k]);
+				if(d < scanDensityDistanceSquared) {
+					optimizedScanRecord[j].splice(k, 1);
+					if(optimizedScanRecord[j].length == 0) {
+						optimizedScanRecord.splice(j, 1);
+					}
+				}
 			}
 		}
 	}
