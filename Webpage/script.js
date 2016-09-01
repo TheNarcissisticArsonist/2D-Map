@@ -1021,6 +1021,13 @@ function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeLis
 	this.scanThetaIncrement = scanThetaIncrement;
 	this.scanRangeList = scanRangeList;
 	this.originalScanIndex = originalScanIndex;
+
+	this.leftMostPoint = function() {
+		//Use these to draw a more detailed pose diagram, which shows the field of view of said pose.
+	}
+	this.rightMostPoint = function() {
+		//Ditto the above.
+	}
 }
 function constraint(a, b, t, sigma) {
 	this.a = a;
