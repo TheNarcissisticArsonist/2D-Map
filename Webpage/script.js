@@ -37,7 +37,7 @@ var mapDataDisplayPageWidth = 500; //The width of the page displaying raw map da
 var mapDataDisplayPageHeight = 500; //The same as above, but this time, the height.
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
-var percentageOfPosesSaved = 25; //What percentage of scans in the initial run are saved as poses. Scans to be saved are selected at random.
+var minimumPoseDistance = 0.1; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -65,7 +65,7 @@ var positionOffset = [0, 0]; //Ditto the above, but for position.
 var rotationTransformOffset = [[1, 0], [0, 1]]; //A rotation matrix that is used for offsetting the position, just like above.
 var highlightedPoses = []; //A list of poses to highlight on the map, to make scan matching easier.
 var recalculatingMap = false; //If the map is being recalculated, you shouldn't be getting new scans.
-var highlightAll = false; //If this is true, all scans will be highlighted.
+var highlightAll = true; //If this is true, all scans will be highlighted.
 
 //HTML Elements
 var canvas, context, dataArea, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton, unHighlightedScanTextArea, unHighlightedScanButton, highlightAllButton, unHighlightAllButton;
@@ -200,9 +200,7 @@ function normalMainLoop(formatted) {
 	if(goodScan) { //If it's a good scan, the pose data is saved (scan data gets saved inside the processScanData function, with the same criteria).
 		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
 		if(farApart(currentPoseData)) { //If the poses are far apart, there's a percent chance the pose will be saved for loop closure.
-			if(Math.random() * 100 < percentageOfPosesSaved) { //This is where the percentage chance is applied with an RNG.
-				poses.push(currentPoseData); //This saves the pose for later use in loop closure.
-			}
+			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
 		}
 	}
 
@@ -874,6 +872,10 @@ function runLoopClosure() {
 		}
 	}
 
+	for(var i=0; i<poses.length; ++i) {
+		poses[i].originalScanIndex = i;
+	}
+
 	recalculatingMap = true;
 
 	updateSLAM(oldLastPose);
@@ -1000,18 +1002,14 @@ function farApart(pose) {
 	}
 	
 	oldPos = poses[poses.length - 1].pose.slice(0, 2);
-	oldRot = poses[poses.length - 1].pose.slice(2, 3);
 	newPos = pose.pose.slice(0, 2);
-	newRot = pose.pose.slice(2, 3);
 
-	if((Math.abs(oldRot - newRot) >= minimumRotationDistanceToRecord) || (distanceSquared(oldPos, newPos) >= minimumPositionDistanceToRecord)) {
-		var takeScan = true;
+	if(distanceSquared(oldPos, newPos) >= Math.pow(minimumPoseDistance, 2)) {
+		return true;
 	}
 	else {
-		var takeScan = false;
+		return false;
 	}
-
-	return takeScan;
 }
 
 function pose(pose, scanMinTheta, scanMaxTheta, scanThetaIncrement, scanRangeList, originalScanIndex) {
