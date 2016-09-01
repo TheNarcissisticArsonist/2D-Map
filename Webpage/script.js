@@ -192,11 +192,22 @@ function normalMainLoop(formatted) {
 
 	var currentPoseData = new pose(currentPose, scanThetaMin, scanThetaMax, scanAngleIncrement, scanRangeList); //The pose data also includes the minimum and maximum angle, as well as the increment and range list.
 
+	var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
+
+	if(goodScan) { //If it's a good scan, the pose data is saved (scan data gets saved inside the processScanData function, with the same criteria).
+		storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
+		if(farApart(currentPoseData)) { //If the poses are far apart, there's a percent chance the pose will be saved for loop closure.
+			if(Math.random() * 100 < percentageOfPosesSaved) { //This is where the percentage chance is applied with an RNG.
+				poses.push(currentPoseData); //This saves the pose for later use in loop closure.
+			}
+		}
+	}
+
 	if(farApart(currentPoseData)) {
-		var goodScan = processScanData(scanThetaMin, scanThetaMax, scanRangeList, scanAngleIncrement, robotPosition, robotOrientationTheta); //The raw scan data is processed here. This is where the bulk of my computing time is.
 		if(goodScan) { //If it's a good scan, all of the data is saved.
-			storePosition(robotPosition); //This appends the robotPosition to the positionRecord array, and does absolutely nothing else (yet).
-			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
+			if(Math.random() * 100 < percentageOfPosesSaved) {
+				
+			}
 		}
 	}
 
