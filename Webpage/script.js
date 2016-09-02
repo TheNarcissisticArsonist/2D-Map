@@ -41,6 +41,8 @@ var poseRecalculationDelay = 0; //The delay between recalculating each pose duri
 var minimumPoseDistance = 0.25; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
 var icpIterationsToKeep = 20; //How many iterations back ICP should record the success of. Used for displaying in the data area.
 var icpLoopWarnCount = 50; //The number of ICP iterations before the program warns you.
+var poseIDVisualOffset = 0.05; //The distance by which identification text is offset from a highlighted pose, in meters.
+var poseIDLetterSpacing = 0.05; //The horizontal distance between each number when displaying the pose ID.
 
 //Global variables
 var positionRecord = []; //This is the list of 2D points where the robot has been, so the program can draw lines between them.
@@ -984,19 +986,19 @@ function drawHighlightedPoses() {
 		for(var i=0; i<poses.length; ++i) {
 			var pose = poses[i];
 			if(pose.originalScanIndex >= startIndex && pose.originalScanIndex < endIndex) {
-				highlight(pose);
+				highlight(pose, i);
 			}
 		}
 	}
 	else {
 		for(var i=0; i<highlightedPoses.length; ++i) {
 			var pose = poses[highlightedPoses[i]];
-			highlight(pose);
+			highlight(pose, i);
 		}
 	}
 	context.strokeStyle = "#000000";
 }
-function highlight(pose) {
+function highlight(pose, poseIndex) {
 	var theta = pose.pose[2];
 	var r = highlightedPoseCircleRadius;
 	context.beginPath();
@@ -1008,6 +1010,17 @@ function highlight(pose) {
 	context.moveTo(pose.pose[0], pose.pose[1]);
 	context.lineTo(pose.pose[0] - (r * Math.cos(theta) * Math.cos(highlightedPoseMarkerAngle)), pose.pose[1] - (r * Math.sin(theta) * Math.cos(highlightedPoseMarkerAngle)))
 	context.stroke();
+
+	var indexString = String(poseIndex);
+	context.font = "0.1px Arial";
+	context.fillStyle = context.strokeStyle;
+	for(var i=0; i<indexString.length; ++i) {
+		var digit = indexString.substring(i, i+1);
+		var horizontalOffset = pose.pose[0] + poseIDVisualOffset + (i * poseIDLetterSpacing);
+		var verticalOffset = pose.pose[1] + poseIDVisualOffset;
+		context.fillText(digit, horizontalOffset, verticalOffset);
+	}
+	context.fillStyle = "#ffffff";
 }
 function userScanHighlighted() {
 	rawIndex = Number(highlightedScanTextArea.value);
