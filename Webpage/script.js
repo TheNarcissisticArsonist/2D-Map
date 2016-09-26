@@ -38,7 +38,7 @@ var mapDataDisplayPageHeight = 500; //The same as above, but this time, the heig
 var highlightedPoseCircleRadius = robotMarkerRadius / 10; //The radius of the circle that marks a highlighted pose.
 var highlightedPoseMarkerAngle = robotMarkerArrowAngle; //The angle of the arrow displaying the robot's direction in a pose.
 var poseRecalculationDelay = 0; //The delay between recalculating each pose during loop closure. Set it to 0 for it to be as fast as possible, or a higher number to see it working in action.
-var minimumPoseDistance = 0.25; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
+var minimumPoseDistance = 0.5; //The minimum distance between the current pose and the last pose in order for the current pose to be saved.
 var icpIterationsToKeep = 20; //How many iterations back ICP should record the success of. Used for displaying in the data area.
 var icpLoopWarnCount = 50; //The number of ICP iterations before the program warns you.
 var poseIDVisualOffset = 0.05; //The distance by which identification text is offset from a highlighted pose, in meters.
@@ -73,6 +73,7 @@ var recalculatingMap = false; //If the map is being recalculated, you shouldn't 
 var highlightAll = true; //If this is true, all scans will be highlighted.
 var lastScansICPIterationCount = []; //The ICP iteration counts for the last x scans. Most recent is 0.
 var messageCounter = 0; //The number of valid messages that gave good scans the page has received from the websocket.
+var manuallySavePose = false; //The user can specifically say to save a scan (for loop closure purposes).
 
 //HTML Elements
 var canvas, context, dataArea, startButton, outerCircle, highlightedScanTextArea, highlightedScanButton, unHighlightedScanTextArea, unHighlightedScanButton, usefulDataArea;
@@ -210,13 +211,9 @@ function normalMainLoop(formatted) {
 		if(farApart(currentPoseData)) { //If the poses are far apart, there's a percent chance the pose will be saved for loop closure.
 			poses.push(currentPoseData); //This saves the pose for later use in loop closure.
 		}
-	}
-
-	if(farApart(currentPoseData)) {
-		if(goodScan) { //If it's a good scan, all of the data is saved.
-			if(Math.random() * 100 < percentageOfPosesSaved) {
-				
-			}
+		else if(manuallySavePose) {
+			poses.push(currentPoseData);
+			manuallySavePose = false;
 		}
 	}
 
@@ -863,6 +860,8 @@ function runLoopClosure() {
 				while(r[2][0] > 2 * Math.PI) { r[2][0] -= 2 * Math.PI; }
 				while(r[2][0] < 0) { r[2][0] += 2 * Math.PI; }
 
+				console.log("Constriant: " + i + ", Iteration: " + iteration + ", r=" + r[2][0]);
+
 				var d = numeric.dot(numeric.inv(numeric.dot(numeric.dot(numeric.transpose(R), constraints[i].sigma), R)), r);
 				d[0][0] *= 2;
 				d[1][0] *= 2;
@@ -878,7 +877,13 @@ function runLoopClosure() {
 
 					var beta = (constraints[i].b - constraints[i].a) * d[j] * alpha;
 					if(Math.abs(beta) > Math.abs(r[j][0])) {
-						beta = r[j][0];
+						if((beta > 0 && r[j][0] < 0) || (beta < 0 && r[j][0] > 0)) {
+							alert("Interesting -- beta and r[j][0] are opposite signs!");
+							beta = -r[j][0];
+						}
+						else {
+							beta = r[j][0];
+						}
 						var beta_residual = true;
 					}
 					else {
@@ -1013,7 +1018,7 @@ function highlight(pose, poseIndex) {
 
 	var indexString = String(poseIndex);
 	context.font = "0.1px Arial";
-	context.fillStyle = context.strokeStyle;
+	context.fillStyle = "#000000";
 	for(var i=0; i<indexString.length; ++i) {
 		var digit = indexString.substring(i, i+1);
 		var horizontalOffset = pose.pose[0] + poseIDVisualOffset + (i * poseIDLetterSpacing);
